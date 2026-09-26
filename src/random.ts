@@ -31,7 +31,40 @@ function getERandom(max: number, rng: UpperBoundedRNG = getRandom): number {
   return Math.min(firstCandidate, secondCandidate);
 }
 
-function getRandom(max: number, mathGlobal: MathGlobal = Math): number {
+// mulberry32 PRNG, used once a seed is set
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return function(): number {
+    state = (state + 0x6D2B79F5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+let seededGenerator: (() => number) | null = null;
+let currentSeed: number | null = null;
+
+function setSeed(seed: number): void {
+  currentSeed = seed;
+  seededGenerator = mulberry32(seed);
+}
+
+function clearSeed(): void {
+  currentSeed = null;
+  seededGenerator = null;
+}
+
+function getSeed(): number | null {
+  return currentSeed;
+}
+
+const seededMathGlobal: MathGlobal = {
+  random: (): number => seededGenerator!(),
+  floor: Math.floor,
+};
+
+function getRandom(max: number, mathGlobal: MathGlobal = seededGenerator ? seededMathGlobal : Math): number {
   return mathGlobal.floor(mathGlobal.random() * (max + 1));
 }
 
@@ -55,6 +88,9 @@ const Random = {
   getRandom,
   getRandom16,
   getRandom16Signed,
+  setSeed,
+  clearSeed,
+  getSeed,
 };
 
 export { Random };
