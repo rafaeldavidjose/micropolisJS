@@ -218,6 +218,17 @@ Simulation.prototype._simFrame = function() {
 };
 
 
+// Same as _simFrame, minus the wall clock throttle
+Simulation.prototype.forceTick = function() {
+  if (this.budget.awaitingValues || this.isPaused())
+    return;
+
+  var simData = this._constructSimData();
+  this._simulate(simData);
+  this._updateTime();
+};
+
+
 Simulation.prototype._clearCensus = function() {
   this._census.clearCensus();
   this._powerManager.clearPowerStack();
