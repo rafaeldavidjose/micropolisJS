@@ -15,6 +15,8 @@
     "watch": "webpack --watch --mode development",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:headless": "tsx --test headless/test/*.ts",
+    "bench:headless": "tsx headless/bench.ts",
     "lint": "tslint src/*.ts test/*.ts",
     "dev": "webpack serve --mode development",
     "production": "webpack serve --mode production"
@@ -28,6 +30,7 @@
     "jest": "30.0.4",
     "ts-jest": "29.4.0",
     "ts-loader": "9.5.2",
+    "tsx": "4.23.15",
     "typescript": "5.8.3",
     "webpack": "5.100.1",
     "webpack-cli": "6.0.1",
