@@ -71,6 +71,23 @@ Added `forceTick()`, the same `awaitingValues`/paused guards as
 Safe because it's a purely additive method. `simTick`, `_simFrame` and
 the browser's `Game.tick()` loop are untouched.
 
+## 5. `tsconfig.json`, scoped `include` to `src/` and `test/`
+
+Commit: `fix(tsconfig): scope include to src/ and test/`
+
+Not a `src/` engine file, but load bearing for keeping the browser game
+working, so it's recorded here too. `tsconfig.json` had no `include`
+field, so TypeScript's default (every `.ts` file under the project root)
+swept up `headless/*.ts` as well. `ts-loader` (webpack's TypeScript
+loader) type checks the whole TS program, not just the files actually
+reachable from webpack's entry point. So `headless/`'s TS to TS imports
+with explicit `.ts` extensions (which require `allowImportingTsExtensions`,
+not enabled here) broke `npm run build` with `TS5097` errors, even though
+nothing in the browser bundle imports `headless/` at all. Confirmed by
+temporarily moving `headless/` aside, the build succeeded with only pre
+existing bundle size warnings. Scoping `include` to what the browser
+build and Jest actually use fixes this with no effect on either.
+
 ---
 
 ## Known limitation found, not fixed
