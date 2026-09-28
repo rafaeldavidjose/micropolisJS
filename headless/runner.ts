@@ -39,6 +39,11 @@ function stepMonths(sim: SimulationLike, months: number): void {
   const ticks = months * TICKS_PER_MONTH;
   for (let i = 0; i < ticks; i++) {
     sim.forceTick();
+
+    // forceTick does nothing while this is set, and there is no UI to clear it
+    if (sim.budget.awaitingValues) {
+      throw new Error('The budget is waiting for player input, time cannot advance');
+    }
   }
 }
 

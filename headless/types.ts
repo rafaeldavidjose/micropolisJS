@@ -18,6 +18,7 @@ interface CensusLike {
 }
 
 interface BudgetLike {
+  awaitingValues: boolean;
   totalFunds: number;
   cityTax: number;
 }
