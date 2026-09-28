@@ -6,12 +6,11 @@
  */
 
 import { createHash } from 'node:crypto';
+import { saveCity } from './runner.ts';
 import type { SimulationLike } from './types.ts';
 
 function hashCity(sim: SimulationLike): string {
-  const data = {};
-  sim.save(data);
-  return createHash('sha256').update(JSON.stringify(data)).digest('hex');
+  return createHash('sha256').update(JSON.stringify(saveCity(sim))).digest('hex');
 }
 
 export { hashCity };
