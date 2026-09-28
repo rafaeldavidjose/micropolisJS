@@ -101,7 +101,9 @@ function saveCity(sim: SimulationLike): SaveData {
   sim.save(data);
   data.seed = seed;
   data.disastersEnabled = sim.disasterManager.disastersEnabled;
-  return data;
+
+  // Census saves its history arrays by reference, so copy them out
+  return structuredClone(data);
 }
 
 function loadCity(data: SaveData): SimulationLike {
@@ -112,7 +114,7 @@ function loadCity(data: SaveData): SimulationLike {
   Random.setSeed(data.seed + data._cityTime);
 
   const map = new GameMap(MAP_WIDTH, MAP_HEIGHT);
-  const sim = new Simulation(map, data._gameLevel, HEADLESS_SPEED, data) as unknown as SimulationLike;
+  const sim = new Simulation(map, data._gameLevel, HEADLESS_SPEED, structuredClone(data)) as unknown as SimulationLike;
 
   // load() restores the saved speed, which can be anything, even paused
   sim.setSpeed(HEADLESS_SPEED);
