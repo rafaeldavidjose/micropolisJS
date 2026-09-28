@@ -8,7 +8,7 @@ interface CensusLike {
   crimeAverage: number;       // set by BlockMapUtils.crimeScan
   pollutionAverage: number;   // set by BlockMapUtils.pollutionTerrainLandValueScan
   landValueAverage: number;   // set by BlockMapUtils.pollutionTerrainLandValueScan
-  trafficAverage: number;     // set by Evaluation's getTrafficAverage (called once/year from doProblems)
+  trafficAverage: number | undefined; // set by Evaluation's getTrafficAverage (called once/year from doProblems)
   resPop: number;
   comPop: number;
   indPop: number;
