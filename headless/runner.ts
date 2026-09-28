@@ -85,7 +85,7 @@ function getState(sim: SimulationLike): CityState {
       pollution: census.pollutionAverage,
       housing: (census.landValueAverage * 7) / 10,
       taxes: budget.cityTax * 10,
-      // Unset until the first cityEvaluation() call happens
+      // Only set by a yearly evaluation with population, and never saved
       traffic: census.trafficAverage ?? 0,
       unemployment: unemployment(census),
       fire: fireSeverity(census),
