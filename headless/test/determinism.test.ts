@@ -1,83 +1,85 @@
-// Run via node:test, not Jest. See README.md for why
+// Run with node:test, not Jest. See README.md
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCity, stepMonths, getState, saveCity, loadCity, Simulation } from '../runner.ts';
 import { hashCity } from '../hash.ts';
-import { Random } from '../../src/random.ts';
+import type { CityState, SaveData, SimulationLike } from '../types.ts';
 
-const YEARS = 20;
-const SEED_A = 20260926;
-const SEED_B = 197001;
-
-function runYears(seed: number, years: number) {
-  Random.setSeed(seed);
-  const sim = createCity({ seed, level: Simulation.LEVEL_HARD, disasters: true });
-  const perYear: Array<{ hash: string; state: ReturnType<typeof getState> }> = [];
-  for (let y = 0; y < years; y++) {
-    stepMonths(sim, 12);
-    perYear.push({ hash: hashCity(sim), state: getState(sim) });
-  }
-  return perYear;
+interface YearRecord {
+  hash: string;
+  state: CityState;
 }
 
-test('same seed: two independent runs match at every year boundary, for 20 years', () => {
-  const runA = runYears(SEED_A, YEARS);
-  const runB = runYears(SEED_A, YEARS);
-  assert.deepEqual(runA, runB);
-});
+const YEARS: number = 20;
+const SEED_A: number = 20260926;
+const SEED_B: number = 197001;
 
-test('different seeds: final state diverges', () => {
-  const runA = runYears(SEED_A, YEARS);
-  const runC = runYears(SEED_B, YEARS);
-  assert.notEqual(runA[runA.length - 1].hash, runC[runC.length - 1].hash);
-});
+function createHardCity(seed: number): SimulationLike {
+  return createCity({ seed: seed, level: Simulation.LEVEL_HARD, disasters: true });
+}
 
-test('save/load: reload-then-continue is itself deterministic and reproducible', () => {
-  function saveReloadContinue(seed: number) {
-    Random.setSeed(seed);
-    const sim = createCity({ seed, level: Simulation.LEVEL_HARD, disasters: true });
-    stepMonths(sim, 12 * (YEARS / 2));
-    const saved = saveCity(sim);
-    const reloaded = loadCity(saved);
-    stepMonths(reloaded, 12 * (YEARS / 2));
-    return { hash: hashCity(reloaded), state: getState(reloaded) };
+function recordYears(city: SimulationLike, years: number): YearRecord[] {
+  const records: YearRecord[] = [];
+
+  for (let year: number = 0; year < years; year++) {
+    stepMonths(city, 12);
+    records.push({ hash: hashCity(city), state: getState(city) });
   }
 
-  const first = saveReloadContinue(SEED_A);
-  const second = saveReloadContinue(SEED_A);
-  assert.deepEqual(first, second);
+  return records;
+}
+
+function continueFromSave(saved: SaveData): YearRecord[] {
+  return recordYears(loadCity(saved), YEARS / 2);
+}
+
+test('same seed: two runs match at every year for 20 years', () => {
+  const firstRun: YearRecord[] = recordYears(createHardCity(SEED_A), YEARS);
+  const secondRun: YearRecord[] = recordYears(createHardCity(SEED_A), YEARS);
+
+  assert.deepEqual(firstRun, secondRun);
 });
 
-test('save/load: reload-then-continue does NOT match an uninterrupted run (known, diagnosed divergence)', () => {
-  // Simulation._simulate starts as a one time wrapper. It runs cityEvaluation()
-  // once, then patches itself to the real dispatch function. That patch
-  // never gets saved, so a reload always redoes the one time eval, burning
-  // extra RNG draws (doVotes, voteProblems) that an uninterrupted run
-  // wouldn't spend there. Everything downstream drifts after that.
-  //
-  // Confirmed by tracing disaster events on both branches. Same
-  // cityTime and phaseCycle, but different disasters fired.
-  //
-  // Not fixing it here since it touches core tick dispatch. Locking in
-  // what actually happens instead of asserting it away.
+test('different seeds: final state differs', () => {
+  const firstRun: YearRecord[] = recordYears(createHardCity(SEED_A), YEARS);
+  const secondRun: YearRecord[] = recordYears(createHardCity(SEED_B), YEARS);
 
-  Random.setSeed(SEED_A);
-  const uninterrupted = createCity({ seed: SEED_A, level: Simulation.LEVEL_HARD, disasters: true });
+  assert.notEqual(firstRun[YEARS - 1].hash, secondRun[YEARS - 1].hash);
+});
+
+test('save/load: a loaded city keeps the disasters option', () => {
+  for (const disasters of [true, false]) {
+    const city: SimulationLike = createCity({ seed: SEED_A, level: Simulation.LEVEL_HARD, disasters: disasters });
+    const loaded: SimulationLike = loadCity(saveCity(city));
+
+    assert.equal(loaded.disasterManager.disastersEnabled, disasters);
+  }
+});
+
+test('save/load: loading the same save twice gives the same run', () => {
+  const city: SimulationLike = createHardCity(SEED_A);
+  stepMonths(city, 12 * (YEARS / 2));
+  const saved: SaveData = saveCity(city);
+
+  const firstRun: YearRecord[] = continueFromSave(saved);
+
+  // Moves the shared generator, which a reproducible load must not depend on
+  recordYears(createHardCity(SEED_B), 1);
+
+  const secondRun: YearRecord[] = continueFromSave(saved);
+
+  assert.deepEqual(firstRun, secondRun);
+});
+
+test('save/load: a loaded city continues like an uninterrupted run', { todo: 'needs engine changes, see CHANGES.md' }, () => {
+  const uninterrupted: SimulationLike = createHardCity(SEED_A);
   stepMonths(uninterrupted, 12 * YEARS);
-  const uninterruptedHash = hashCity(uninterrupted);
-  const uninterruptedState = getState(uninterrupted);
 
-  Random.setSeed(SEED_A);
-  const sim = createCity({ seed: SEED_A, level: Simulation.LEVEL_HARD, disasters: true });
-  stepMonths(sim, 12 * (YEARS / 2));
-  const saved = saveCity(sim);
-  const reloaded = loadCity(saved);
-  stepMonths(reloaded, 12 * (YEARS / 2));
+  const city: SimulationLike = createHardCity(SEED_A);
+  stepMonths(city, 12 * (YEARS / 2));
+  const loaded: SimulationLike = loadCity(saveCity(city));
+  stepMonths(loaded, 12 * (YEARS / 2));
 
-  // Date and cityTime survive the reload fine, only the RNG side drifts
-  assert.deepEqual(getState(reloaded).date, uninterruptedState.date);
-
-  // Full state is not expected to match, see comment above
-  assert.notEqual(hashCity(reloaded), uninterruptedHash);
+  assert.equal(hashCity(loaded), hashCity(uninterrupted));
 });
