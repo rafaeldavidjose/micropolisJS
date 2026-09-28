@@ -49,10 +49,18 @@ interface SimulationLike {
   _gameLevel: number;
   getDate(): { year: number; month: number };
   forceTick(): void;
+  setSpeed(speed: number): void;
   save(data: Record<string, unknown>): void;
 }
 
-type SaveData = Record<string, unknown>;
+// Engine save output plus the two fields saveCity adds
+interface SaveData {
+  _cityTime: number;
+  _gameLevel: number;
+  seed: number;
+  disastersEnabled: boolean;
+  [key: string]: unknown;
+}
 
 interface CreateCityOptions {
   seed: number;

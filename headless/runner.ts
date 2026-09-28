@@ -23,11 +23,15 @@ const PHASES_PER_TIME_UNIT = 16;
 const TIME_UNITS_PER_MONTH = 4;
 const TICKS_PER_MONTH = PHASES_PER_TIME_UNIT * TIME_UNITS_PER_MONTH;
 
+// The engine keeps no seed, saveCity needs it to make loads reproducible
+const citySeeds = new WeakMap<SimulationLike, number>();
+
 function createCity(options: CreateCityOptions): SimulationLike {
   Random.setSeed(options.seed);
   const map = MapGenerator(MAP_WIDTH, MAP_HEIGHT);
   const sim = new Simulation(map, options.level, HEADLESS_SPEED, null) as unknown as SimulationLike;
   sim.disasterManager.disastersEnabled = !!options.disasters;
+  citySeeds.set(sim, options.seed);
   return sim;
 }
 
@@ -88,14 +92,33 @@ function getState(sim: SimulationLike): CityState {
 }
 
 function saveCity(sim: SimulationLike): SaveData {
-  const data: SaveData = {};
+  const seed = citySeeds.get(sim);
+  if (seed === undefined) {
+    throw new Error('saveCity only works on cities from createCity or loadCity');
+  }
+
+  const data = {} as SaveData;
   sim.save(data);
+  data.seed = seed;
+  data.disastersEnabled = sim.disasterManager.disastersEnabled;
   return data;
 }
 
 function loadCity(data: SaveData): SimulationLike {
+  /* The engine does not save the position of the random generator, so a
+   * loaded city cannot continue the original sequence. Reseeding from the
+   * seed and the city time makes every load of the same save reproducible.
+   * It has to happen before the constructor, which already draws numbers. */
+  Random.setSeed(data.seed + data._cityTime);
+
   const map = new GameMap(MAP_WIDTH, MAP_HEIGHT);
-  return new Simulation(map, data._gameLevel, HEADLESS_SPEED, data) as unknown as SimulationLike;
+  const sim = new Simulation(map, data._gameLevel, HEADLESS_SPEED, data) as unknown as SimulationLike;
+
+  // load() restores the saved speed, which can be anything, even paused
+  sim.setSpeed(HEADLESS_SPEED);
+  sim.disasterManager.disastersEnabled = data.disastersEnabled;
+  citySeeds.set(sim, data.seed);
+  return sim;
 }
 
 // So callers can pass Simulation.LEVEL_* without us reinventing it
