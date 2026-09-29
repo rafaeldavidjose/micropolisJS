@@ -1,135 +1,142 @@
-# Engine changes made for the headless runner
+# Changes outside headless/
 
-Every change below is minimal, single purpose, and its own commit. This
-file exists so each one can be cited and justified individually.
+Each change is its own commit so I can cite it on its own.
 
-## 1. `src/boatSprite.js`, removed a dead broken import
+## Engine changes
 
-Commit: `fix(boatSprite): remove dead broken SpriteConstants import`
+### 1. src/boatSprite.js: removed an unused, broken import
 
-`boatSprite.js` had `import { SpriteConstants } from './spriteConstants.ts';`,
-but `spriteConstants.ts` has no `SpriteConstants` named export (it exports
-individual consts like `SPRITE_SHIP`). The import was never referenced
-anywhere in the file. Node's ESM loader refuses to load a module with an
-unsatisfiable named import, which blocked constructing `Simulation` under
-Node at all. Webpack's bundler tolerates it silently since it's dead code.
+Commit `5d11c91`.
 
-Safe because the import was unused. Deleting it changes nothing at
-runtime in the browser build.
+`boatSprite.js` imported `SpriteConstants` from `spriteConstants.ts`, but
+that file has no such export. It only exports single constants like
+`SPRITE_SHIP`. The import was never used. Webpack ignores it, but Node
+refuses to load a module with a named import that does not exist, so
+`Simulation` could not be created in Node at all. Removing the line
+changes nothing in the browser build.
 
-## 2. `src/simulation.js`, fixed a `ReferenceError` in the annual census
+### 2. src/simulation.js: `budget` changed to `this.budget` in the census calls
 
-Commit: `fix(simulation): use this.budget in take10/120Census calls`
+Commit `642655e`.
 
 ```js
-this._census.take10Census(budget);   // was bare `budget`, not this.budget
-this._census.take120Census(budget);
+this._census.take10Census(this.budget);
+this._census.take120Census(this.budget);
 ```
 
-`budget` isn't declared anywhere in that function's scope. Every other
-reference to the budget in this file uses `this.budget`. Since ES modules
-are always strict mode, this threw a `ReferenceError` the first time
-`_cityTime` reached a multiple of 4 while `_phaseCycle` was 9, roughly
-once per simulated month, which unwinds the stack past the point where
-the browser's `Game.tick()` loop reschedules itself. This almost
-certainly already broke the browser build too, after about a month of
-play. Confirmed pre-existing and unrelated to headless work: present on
-`main` before any of these changes, and reproduced by running the
-unmodified engine.
+Both calls used a bare `budget`, which is not declared in that function.
+Every other use in the file is `this.budget`. In Node this threw a
+`ReferenceError` the first time the monthly census ran, so a headless run
+stopped after about one month. The bug was already in upstream.
 
-Safe because it restores the file's own established pattern
-(`this.budget`, used everywhere else in `simulation.js`). It doesn't
-change what the code was trying to do.
+In the browser it most likely did not throw. `index.html` has an element
+with `id="budget"`, and browsers make element ids available as global
+variables, so `budget` pointed at that element. `take10Census` then read
+`cashFlow` from it, got `undefined`, and stored `NaN` in the money history
+used by the graphs. I have not checked this in a browser.
 
-## 3. `src/random.ts`, added an optional seeded PRNG
+### 3. src/random.ts: optional seeded generator
 
-Commit: `feat(random): add optional seeded PRNG via Random.setSeed/getSeed/clearSeed`
+Commit `97440e2`.
 
-Added a mulberry32 PRNG behind `Random.setSeed(seed)`, `Random.getSeed()`
-and `Random.clearSeed()`. `getRandom`'s default `mathGlobal` parameter now
-resolves to the seeded generator when a seed is set, otherwise falls
-through to `Math` exactly as before. The expression is re-evaluated on
-every call, so every other `Random.*` function (all of which bottom out
-through `getRandom`/`getRandom16`) picks up seeding automatically, with
-no changes of their own.
+I added a mulberry32 generator with `Random.setSeed(seed)`,
+`Random.getSeed()` and `Random.clearSeed()`. When a seed is set,
+`getRandom` uses it by default, otherwise it uses `Math` as before. The
+default is evaluated on every call, and all other `Random` functions go
+through `getRandom`, so they are all seeded without changes of their own.
+With no seed set the behavior is the same as before. Calls that pass their
+own generator, like the Jest tests in `test/random.ts`, are not affected,
+and those tests still pass.
 
-Safe because with no seed ever set, behavior is unchanged and falls
-through to `Math`, same as today. Calls that pass an explicit
-`mathGlobal`/`rng` argument (as every existing `test/random.ts` Jest test
-does) are unaffected either way.
+### 4. src/simulation.js: added `forceTick()`
 
-## 4. `src/simulation.js`, added `forceTick()`
+Commit `4341a1b`.
 
-Commit: `feat(simulation): add forceTick() for wall-clock-independent stepping`
+`_simFrame` only advances the simulation when enough real time has passed,
+using `new Date()`. For headless runs I need to step without a clock.
+`forceTick()` has the same checks as `_simFrame` for a paused game and for
+a budget waiting for input, then calls `_simulate` and `_updateTime`
+directly. It is a new method, so `simTick`, `_simFrame` and the browser
+loop are unchanged.
 
-`Simulation.prototype._simFrame` throttles phase advancement to real time
-via `new Date()`, which is the wrong behavior for headless stepping.
-Added `forceTick()`, the same `awaitingValues`/paused guards as
-`_simFrame`, but no `Date` threshold. It calls `_simulate(simData)` and
-`_updateTime()` directly.
+## Configuration changes
 
-Safe because it's a purely additive method. `simTick`, `_simFrame` and
-the browser's `Game.tick()` loop are untouched.
+### 5. tsconfig.json: `include` limited to src/ and test/
 
-## 5. `tsconfig.json`, scoped `include` to `src/` and `test/`
+Commit `9872afd`.
 
-Commit: `fix(tsconfig): scope include to src/ and test/`
+`tsconfig.json` had no `include`, so TypeScript picked up every `.ts` file
+in the project, including `headless/`. `ts-loader` type checks the whole
+program, even files that webpack never bundles. The `.ts` extensions in
+the headless imports need `allowImportingTsExtensions`, which the project
+does not enable, so `npm run build` failed with `TS5097`. With `headless/`
+moved away the build worked, with only the bundle size warnings it already
+had. Limiting `include` to `src/` and `test/` fixed it without affecting
+the build or Jest.
 
-Not a `src/` engine file, but load bearing for keeping the browser game
-working, so it's recorded here too. `tsconfig.json` had no `include`
-field, so TypeScript's default (every `.ts` file under the project root)
-swept up `headless/*.ts` as well. `ts-loader` (webpack's TypeScript
-loader) type checks the whole TS program, not just the files actually
-reachable from webpack's entry point. So `headless/`'s TS to TS imports
-with explicit `.ts` extensions (which require `allowImportingTsExtensions`,
-not enabled here) broke `npm run build` with `TS5097` errors, even though
-nothing in the browser bundle imports `headless/` at all. Confirmed by
-temporarily moving `headless/` aside, the build succeeded with only pre
-existing bundle size warnings. Scoping `include` to what the browser
-build and Jest actually use fixes this with no effect on either.
+### 6. jest.config.js renamed to jest.config.cjs
 
----
+Commit `4a3aea3`.
 
-## Known limitation found, not fixed
+`package.json` sets `"type": "module"`, which upstream added, so Node
+treats every `.js` file as an ES module. `jest.config.js` uses
+`module.exports`, so `npm test` failed before running any test. The `.cjs`
+extension makes Node load it as CommonJS. Only the file name changed.
 
-`Simulation.prototype._simulate`'s bootstrap pattern is not save/load
-safe.
+`npm test` now runs 162 tests and 160 pass. The 2 failures are in
+`test/bounds.ts`. They expect `Bounds` to assert on a zero width or height,
+but upstream commented those asserts out in commit `46b9d79`. I left them.
 
-`_simulate` starts out as a one time wrapper:
+## Known limitation: a loaded city does not continue exactly
+
+A city that is saved and loaded does not continue the same way as a city
+that was never saved. Loading the same save twice does give the same run,
+which is what I need, so I did not change the engine for this.
+
+I measured the causes by saving a hard city at year 10 and comparing it
+with an uninterrupted run. These come from the engine:
+
+- `_simCycle` is not in the save data, so it restarts at 0 after a load.
+  It decides when the pollution, population density and other scans run,
+  so they happen on different ticks than in the uninterrupted run.
+- The `Simulation` constructor always runs a full map scan in `init()`,
+  also when loading. Fire and flood tiles draw random numbers and advance
+  one extra step during that scan.
+- The position of the random generator is not saved. `random.ts` has no
+  way to read or restore the mulberry32 state.
+- `_simulate` runs one extra `cityEvaluation()` on the first tick of every
+  new `Simulation`, including a loaded one. For a city with population
+  that draws random numbers in `doVotes` and `voteProblems`. For the empty
+  test city it draws nothing, because the evaluation only resets when the
+  population is 0.
+
+An earlier version of this file named only the last point as the cause.
+That was wrong for the tested city.
+
+Three other causes were in `headless/` and are fixed now. `loadCity` lost
+the disasters option, since the engine does not save it and turns
+disasters off by default. It kept whatever speed was saved. And the saved
+data shared the census history arrays with the running city.
+
+After I restored the disasters option, `_simCycle`, the block maps and the
+flood counter from outside and skipped the extra evaluation, the two runs
+still differed. Fixing this fully would need engine changes: saving
+`_simCycle` (with a default for older saves), a way to save and restore
+the generator state, and skipping the scan and the evaluation side effects
+when loading. The last test in `headless/test/determinism.test.ts`
+describes the expected behavior and is marked as todo.
+
+## Known upstream bug, not fixed
+
+In `src/disasterManager.js`, `makeFlood` checks the tiles next to water
+with:
 
 ```js
-Simulation.prototype._simulate = function(simData) {
-  this.evaluation.cityEvaluation(simData);
-  this._simulate = simulate;
-  this._simulate(simData);
-};
+if (tile === TileValues.DIRT || (tile.isBulldozable() && tile.isCombustible)) {
 ```
 
-The first call runs an unconditional `cityEvaluation()`, then patches
-`this._simulate` (an own property on the instance) to the real
-phaseCycle dispatch function for every call after. That patch is a
-function, not data, so it's never part of `save()`/`load()`'s output.
-Every freshly constructed `Simulation`, including one built by
-`loadCity()` from a saved game well into a run, starts with the wrapper
-again. Its first `forceTick()` after a reload therefore always reruns
-one genuinely extra, unscheduled `cityEvaluation()` (consuming
-`doVotes()`'s fixed 100 `Random.getRandom(1000)` draws, plus
-`voteProblems()`'s variable draws) that an uninterrupted run never
-consumes at that exact point. That permanently shifts the RNG stream, so
-every RNG driven outcome after a reload (disasters and so on) diverges
-from what an uninterrupted run would have produced. This happens even on
-an empty, undeveloped city and has nothing to do with zone building or
-pollution.
-
-Confirmed directly by tracing disaster events on both branches (hard,
-disasters on, save at year 10 of 20). The uninterrupted run fires
-disasters the reloaded branch does not, despite `_cityTime` and
-`_phaseCycle` being provably identical at every checkpoint.
-
-Not fixed here. Correcting this means changing `Simulation`'s core tick
-dispatch self patching pattern, for example skipping the bootstrap
-evaluation specifically when continuing a saved game rather than
-starting a brand new city. That's not a minimal, single purpose change
-and it deserves its own review. See `headless/test/determinism.test.ts`,
-which documents and locks in the current, diverging behavior with a full
-explanation instead of asserting it away or skipping it.
+`tile` is a `Tile` object, so comparing it with the number `DIRT` is
+always false. `tile.isCombustible` has no parentheses, so it is the
+function itself and always true. A flood can therefore start on any
+bulldozable tile next to water. Fixing it would change how the game
+behaves, so I left it and only note it here.
