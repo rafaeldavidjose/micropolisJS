@@ -1,16 +1,11 @@
-/* headless/hash.ts
- *
- * Hashes a Simulation's save() output for reproducibility checks. save()
- * always writes its keys in the same order, so JSON.stringify is stable
- * across runs without any sorting.
- */
-
 import { createHash } from 'node:crypto';
 import { saveCity } from './runner.ts';
 import type { SimulationLike } from './types.ts';
 
-function hashCity(sim: SimulationLike): string {
-  return createHash('sha256').update(JSON.stringify(saveCity(sim))).digest('hex');
+// save() writes its keys in a fixed order, so no sorting is needed
+function hashCity(city: SimulationLike): string {
+  const json: string = JSON.stringify(saveCity(city));
+  return createHash('sha256').update(json).digest('hex');
 }
 
 export { hashCity };
