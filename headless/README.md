@@ -1,149 +1,157 @@
-# Headless micropolisJS runner
+# Headless runner
 
-A headless, deterministic wrapper around the micropolisJS engine. Create a
-city from a seed, level and disasters option, advance it N months as fast
-as possible with no wall clock dependency, and read back a plain object
-snapshot of its state. No agents, no LLMs, no action API. This only proves
-the engine itself runs headless and reproducibly in Node.
+This folder runs the micropolisJS engine in Node without the browser UI. I
+can create a city from a seed, a difficulty level and a disasters option,
+advance it a number of months as fast as the CPU allows, and read back a
+summary of its state. The same seed always gives the same result. There is
+no action API yet, so the runner itself never builds anything.
 
-See `CHANGES.md` for the engine changes this required, and one genuine
-limitation that was found and documented instead of fixed.
+The engine changes this needed are listed in `CHANGES.md`.
 
 ## Running
 
-Requires `npm install` once (adds `tsx` and the rest of the project's dev
-dependencies).
+Run `npm install` once. It installs `tsx`, which runs the TypeScript files
+directly.
 
 ```sh
-npm run test:headless   # node:test reproducibility suite
+npm run test:headless   # determinism tests (node:test)
 npm run bench:headless  # times 20 in-game years
 ```
 
-Or run either file directly with `npx tsx <path>`.
+The tests use `node:test` because the project's Jest setup only covers
+`src/` and `test/`. `npm test` still runs the engine's own Jest tests.
 
-## API (`runner.ts`)
+## API
 
-```ts
-import { createCity, stepMonths, getState, saveCity, loadCity, Simulation } from './runner.ts';
-
-const sim = createCity({ seed: 12345, level: Simulation.LEVEL_HARD, disasters: true });
-stepMonths(sim, 12); // advance one year
-const state = getState(sim);
-const saved = saveCity(sim);
-const reloaded = loadCity(saved); // see CHANGES.md's known limitation first
-```
-
-`createCity({ seed, level, disasters })` takes `level` as one of
-`Simulation.LEVEL_EASY`, `LEVEL_MED` or `LEVEL_HARD` (re-exported here, not
-reinvented). It seeds the engine's RNG (`Random.setSeed`, `src/random.ts`)
-before generating the map, so map generation itself is reproducible.
-
-`stepMonths(sim, n)` advances exactly `n` months via
-`Simulation.prototype.forceTick()` (`src/simulation.js`), which steps one
-phase cycle with no wall clock dependency. `TICKS_PER_MONTH` (64) comes
-directly from the engine's own constants, 16 phase cycles per time unit and
-4 time units per month.
-
-`getState(sim)` returns the shape below.
-
-`saveCity(sim)` and `loadCity(data)` are thin wrappers around
-`Simulation.prototype.save()` and the `Simulation` constructor's existing
-saved game path (`src/simulation.js`), the same way `Game.js` loads a saved
-game in the browser. No engine changes were needed for this.
-
-### Simulation speed is fixed
-
-`HEADLESS_SPEED = Simulation.SPEED_MED` matches `Game.js`'s own default
-speed for a new browser game. Speed no longer paces wall clock ticking here
-(`forceTick` has none), it only controls how often secondary block map
-scans (power, pollution and land value, crime, population density, fire)
-refresh relative to sim ticks (`src/simulation.js`'s `speedPowerScan` and
-friends). It's fixed as a constant so every headless run refreshes these at
-the same rate.
-
-### `Random` is a process wide singleton
-
-`Random.setSeed`, `getSeed` and `clearSeed` (`src/random.ts`) are module
-level, not per `Simulation`. Never advance two `Simulation` instances in an
-interleaved way while comparing them. Each one's `forceTick()` consumes
-from the same shared generator, so interleaving corrupts both branches'
-streams relative to running them in isolation. Let one full run (or one
-full create, step, save, reload, step sequence) complete before starting
-the next comparison run, and reset the seed at the start of each.
-
-### `getState(sim)` shape
+Everything is in `runner.ts`.
 
 ```ts
-{
-  date: { year, month },                 // sim.getDate()
-  funds: number,                          // sim.budget.totalFunds
-  population: number,                     // sim.evaluation.cityPop
-  score: number,                          // sim.evaluation.cityScore
-  cityClass: string,                      // sim.evaluation.cityClass
-  approval: number,                       // sim.evaluation.cityYes, 0 to 100
-  rci: { residential, commercial, industrial },  // sim._valves.{res,com,ind}Valve, signed
-  problems: { crime, pollution, housing, taxes, traffic, unemployment, fire },
-  poweredZoneCount: number,
-  unpoweredZoneCount: number,
-  taxRate: number,
-}
+import { createCity, stepMonths, getState, saveCity, loadCity, Simulation }
+  from './runner.ts';
+
+const city = createCity({ seed: 12345, level: Simulation.LEVEL_HARD, disasters: true });
+stepMonths(city, 12);
+const state = getState(city);
+const saved = saveCity(city);
+const loaded = loadCity(saved);
 ```
 
-`crime`, `pollution`, `housing`, `taxes` and `traffic` are read straight
-from public fields (`census.crimeAverage`, `census.pollutionAverage`,
-`census.landValueAverage`, `budget.cityTax`, `census.trafficAverage`).
-`unemployment` and `fire` are recomputed in `runner.ts` using the same one
-line formulas as `Evaluation`'s private `getUnemployment` and
-`getFireSeverity` (`src/evaluation.js`). Those two are never stored
-anywhere on the instance, so there's nothing to read. The alternative was
-a small additive engine change, and duplicating two one line pure formulas
-was chosen instead to keep the engine change list to exactly the four in
-`CHANGES.md`.
+`createCity` takes the level as `Simulation.LEVEL_EASY`, `LEVEL_MED` or
+`LEVEL_HARD`, which `runner.ts` re-exports from the engine. It seeds the
+random generator before the map is generated, so the map depends on the
+seed too.
 
-`census.trafficAverage` specifically is a side effect of the private,
-once a year evaluation pass, and it's not part of `Census`'s saved fields.
-It reads as `undefined` until the first `cityEvaluation()` call on a given
-instance, whether that's a brand new city or transiently right after
-`loadCity()`, before the very next `forceTick()`. `getState()` defaults it
-to `0` rather than leaking `undefined`.
+`stepMonths` calls `forceTick()` 64 times per month. One `forceTick()` runs
+one phase of the engine's cycle. 16 phases make one time unit and 4 time
+units make one month. If the city cannot pay for its services, the engine
+stops and waits for the player to answer the budget window. There is no
+UI to do that, so `stepMonths` throws an error instead of silently not
+advancing.
 
-Reading `sim._valves` and `sim._census` from outside `Simulation` is
-deliberate. JS doesn't enforce the underscore prefix convention, and
-adding getters nothing else needs would be more engine surface than this
-needed.
+The simulation speed is fixed at `Simulation.SPEED_MED`, the same default
+as a new game in the browser. With `forceTick()` there is no wall clock, so
+speed only decides how often the power, pollution, crime, population
+density and fire scans run. The engine saves the speed with the city, so
+`loadCity` sets it back to `SPEED_MED` after loading.
 
-## Determinism, as actually measured
+The engine uses one random generator for the whole process. Two cities
+stepped in turn would take numbers from the same sequence and change each
+other's results. When comparing runs I finish one run before starting the
+next. `createCity` and `loadCity` both reseed the generator.
 
-See `headless/test/determinism.test.ts` for the full suite (`npm run
-test:headless`). Summary:
+## State
 
-* Same seed, 20 years, hard difficulty, disasters on. Two independent runs
-  produce identical hashes and `getState()` at every year boundary and at
-  the end. Passes.
-* Different seeds. Final state diverges. Passes.
-* Save at year 10, reload, continue 10 more years, twice. Both reloads
-  produce identical results to each other, so reload then continue is
-  itself deterministic and reproducible. Passes.
-* Save at year 10, reload, continue 10 more years, against an
-  uninterrupted 20 year run. This does not match. It's a real, diagnosed,
-  pre-existing engine limitation (see `CHANGES.md`'s known limitation
-  section), not a bug in headless/ code and not introduced by any of the
-  engine changes above. The test documents and locks in this behavior
-  instead of silently asserting it away.
+`getState(city)` returns these fields and reads them from:
 
-## What "disasters: true" actually does right now
+- `date`: `getDate()`, with month 0 as January
+- `funds`: `budget.totalFunds`
+- `population`: `evaluation.cityPop`
+- `score`: `evaluation.cityScore`
+- `cityClass`: `evaluation.cityClass`
+- `approval`: `evaluation.cityYes`, from 0 to 100
+- `rci`: `_valves.resValve`, `comValve` and `indValve`
+- `problems`: the seven problem values, see below
+- `poweredZoneCount` and `unpoweredZoneCount`: from `_census`
+- `taxRate`: `budget.cityTax`
 
-No action API exists yet, so a headless city never has roads or zones and
-population stays at 0 for the whole run. `disasterManager.doDisasters()`
-still rolls its dice every simulated time unit on schedule, and
-fire, flood and meltdown disasters (which mutate the map tiles directly)
-work fully. Monster and tornado disasters spawn a sprite (consuming their
-RNG draws on schedule, so they don't affect reproducibility), but
-`SpriteManager.moveObjects()`, which is what makes sprites wander, cause
-further damage and eventually expire, is only ever called from `Game.js`'s
-`requestAnimationFrame` loop in the browser, never from `simTick()`.
-Headless doesn't call it either, so a spawned monster or tornado sits
-inert forever. This is a deliberate phase 1 choice (calling it would mean
-inventing an arbitrary calls per tick constant with no basis in the
-engine's own code). Worth revisiting once an action API exists and city
-development is actually happening.
+The engine computes its seven problem values only during the yearly
+evaluation and keeps them in a private array in `src/evaluation.js`.
+`getState` recomputes them from the current census with the same formulas.
+Crime, pollution, housing and taxes come straight from census and budget
+fields. Unemployment and fire severity are copies of two private one line
+functions in `evaluation.js`. Traffic is the exception. It is the value
+from the last yearly evaluation of a city with population, and it is not
+saved. For an empty city, and after a load until the next such
+evaluation, it reads 0.
+
+Approval and population are not saved either. Right after `loadCity` they
+read 0 until the first tick. For a city with no population the yearly
+evaluation only resets itself, so the score stays at 500 and approval at
+50.
+
+`runner.ts` reads `_valves` and `_census` directly. The underscore is only
+a naming convention in the engine, and adding getters to the engine just
+for this seemed unnecessary.
+
+## Determinism
+
+The tests in `test/determinism.test.ts` check that:
+
+- two runs with the same seed match at every year boundary for 20 years
+  (hard, disasters on), using a hash of the full save data and `getState`
+- two different seeds end in different states
+- a small developed city gives the same run twice for 20 years
+- a loaded city keeps its disasters option
+- loading the same save twice gives the same run, even if other runs used
+  the shared generator in between
+
+On an empty map only the disaster code uses random numbers. With the test
+seed, only 41 of the 12,000 tiles change in 20 years. That is why the developed city test
+exists. It places a coal plant, a road, zones on both sides and a power
+line with the engine's own tools from `src/gameTools.js`, so growth,
+traffic, power and the budget run as well. The test also checks that the
+population grew, otherwise it would prove nothing.
+
+I also checked by hand that the same seed gives the same hash in two
+separate Node processes.
+
+## Save and load
+
+`saveCity` returns the engine's save data plus two fields: the seed and the
+disasters option. The engine does not save either. It also returns a copy,
+because the census saves its history arrays by reference and the saved
+data would otherwise keep changing while the city runs.
+
+The engine does not save where the random generator is in its sequence.
+`loadCity` therefore reseeds it from the saved seed plus the city time.
+Loading the same save always gives the same run, in any process.
+
+A loaded city does not continue exactly like a city that was never saved.
+The reasons are in the engine and are listed in `CHANGES.md`. The last test
+asserts that both runs match and is marked as todo, so it shows up in the
+output without failing the suite.
+
+## Performance
+
+`npm run bench:headless` advances a hard city with disasters on for 20
+years. Over five runs it took between 110 and 112 ms, about 5.5 ms per
+year. I measured this with Node 24.15.0 on an Intel Core Ultra 7 258V on
+Windows 11. The map is empty, so a developed city does more work per tick
+and will be slower.
+
+## Things to keep in mind
+
+Tornado and monster disasters create a sprite, but sprites only move when
+`SpriteManager.moveObjects()` runs. In the browser that happens in
+`Game.js`'s animation loop, never in the simulation tick, and the runner
+does not call it either. A tornado therefore stays where it appears and
+does no further damage. A monster needs average pollution above 60, so it
+never appears on an empty map. I left this as it is because calling
+`moveObjects()` would mean choosing a number of calls per tick that the
+engine does not define.
+
+In `src/evaluation.js`, every yearly evaluation of a city with population
+adds 7 entries to a module level array that is never cleared. The array is
+shared by every city in the process. It does not change any result, but
+memory grows a little with every simulated year and is only freed when the
+process ends. This matters for long batch runs in one process.
