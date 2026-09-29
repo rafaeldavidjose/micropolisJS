@@ -1,14 +1,10 @@
-/* headless/types.ts
- *
- * These are just the bits of Simulation that headless/ actually reads
- * or calls, since src/*.js has no TS types.
- */
+// src/*.js has no types, so these describe only what headless/ uses
 
 interface CensusLike {
-  crimeAverage: number;       // set by BlockMapUtils.crimeScan
-  pollutionAverage: number;   // set by BlockMapUtils.pollutionTerrainLandValueScan
-  landValueAverage: number;   // set by BlockMapUtils.pollutionTerrainLandValueScan
-  trafficAverage: number | undefined; // set by Evaluation's getTrafficAverage (called once/year from doProblems)
+  crimeAverage: number;
+  pollutionAverage: number;
+  landValueAverage: number;
+  trafficAverage: number | undefined;
   resPop: number;
   comPop: number;
   indPop: number;
@@ -27,7 +23,7 @@ interface EvaluationLike {
   cityPop: number;
   cityScore: number;
   cityClass: string;
-  cityYes: number; // Mayor approval percent, 0 to 100
+  cityYes: number;
 }
 
 interface ValvesLike {
@@ -40,17 +36,20 @@ interface DisasterManagerLike {
   disastersEnabled: boolean;
 }
 
+interface CityDate {
+  year: number;
+  month: number;
+}
+
 interface SimulationLike {
   budget: BudgetLike;
   evaluation: EvaluationLike;
   disasterManager: DisasterManagerLike;
-  // Underscore prefixed by convention only, JS doesn't enforce it
+  blockMaps: unknown;
   _valves: ValvesLike;
   _census: CensusLike;
-  _gameLevel: number;
   _map: unknown;
-  blockMaps: unknown;
-  getDate(): { year: number; month: number };
+  getDate(): CityDate;
   forceTick(): void;
   setSpeed(speed: number): void;
   save(data: Record<string, unknown>): void;
@@ -67,12 +66,12 @@ interface SaveData {
 
 interface CreateCityOptions {
   seed: number;
-  level: number; // Simulation.LEVEL_EASY | LEVEL_MED | LEVEL_HARD
+  level: number;
   disasters?: boolean;
 }
 
 interface CityState {
-  date: { year: number; month: number };
+  date: CityDate;
   funds: number;
   population: number;
   score: number;
@@ -98,12 +97,9 @@ interface CityState {
 }
 
 export type {
-  SimulationLike,
   CensusLike,
-  BudgetLike,
-  EvaluationLike,
-  ValvesLike,
-  SaveData,
-  CreateCityOptions,
   CityState,
+  CreateCityOptions,
+  SaveData,
+  SimulationLike,
 };

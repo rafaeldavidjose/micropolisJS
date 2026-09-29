@@ -2,7 +2,14 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createCity, stepMonths, getState, saveCity, loadCity, Simulation } from '../runner.ts';
+import {
+  createCity,
+  stepMonths,
+  getState,
+  saveCity,
+  loadCity,
+  Simulation,
+} from '../runner.ts';
 import { hashCity } from '../hash.ts';
 import type { CityState, SaveData, SimulationLike } from '../types.ts';
 import { GameTools } from '../../src/gameTools.js';
@@ -20,16 +27,25 @@ interface ToolLike {
 const YEARS: number = 20;
 const SEED_A: number = 20260926;
 const SEED_B: number = 197001;
+const RESUME_TODO: string = 'needs engine changes, see CHANGES.md';
 
 function createHardCity(seed: number): SimulationLike {
-  return createCity({ seed: seed, level: Simulation.LEVEL_HARD, disasters: true });
+  return createCity({
+    seed: seed,
+    level: Simulation.LEVEL_HARD,
+    disasters: true,
+  });
 }
 
 /* A coal plant, a road with zones on both sides and a power line, so that
  * growth, traffic, power and the budget run too. A few placements fail
  * where the land is not clear, which is fine for this test. */
 function createDevelopedCity(seed: number): SimulationLike {
-  const city: SimulationLike = createCity({ seed: seed, level: Simulation.LEVEL_EASY, disasters: true });
+  const city: SimulationLike = createCity({
+    seed: seed,
+    level: Simulation.LEVEL_EASY,
+    disasters: true,
+  });
   const tools: Record<string, ToolLike> = GameTools(city._map);
   const roadY: number = 50;
 
@@ -86,8 +102,10 @@ test('different seeds: final state differs', () => {
 });
 
 test('developed city: same seed gives the same run for 20 years', () => {
-  const firstRun: YearRecord[] = recordYears(createDevelopedCity(SEED_A), YEARS);
-  const secondRun: YearRecord[] = recordYears(createDevelopedCity(SEED_A), YEARS);
+  const firstRun: YearRecord[] =
+    recordYears(createDevelopedCity(SEED_A), YEARS);
+  const secondRun: YearRecord[] =
+    recordYears(createDevelopedCity(SEED_A), YEARS);
 
   assert.deepEqual(firstRun, secondRun);
 
@@ -96,8 +114,14 @@ test('developed city: same seed gives the same run for 20 years', () => {
 });
 
 test('save/load: a loaded city keeps the disasters option', () => {
-  for (const disasters of [true, false]) {
-    const city: SimulationLike = createCity({ seed: SEED_A, level: Simulation.LEVEL_HARD, disasters: disasters });
+  const disasterOptions: boolean[] = [true, false];
+
+  for (const disasters of disasterOptions) {
+    const city: SimulationLike = createCity({
+      seed: SEED_A,
+      level: Simulation.LEVEL_HARD,
+      disasters: disasters,
+    });
     const loaded: SimulationLike = loadCity(saveCity(city));
 
     assert.equal(loaded.disasterManager.disastersEnabled, disasters);
@@ -119,7 +143,8 @@ test('save/load: loading the same save twice gives the same run', () => {
   assert.deepEqual(firstRun, secondRun);
 });
 
-test('save/load: a loaded city continues like an uninterrupted run', { todo: 'needs engine changes, see CHANGES.md' }, () => {
+test('save/load: a loaded city continues like an uninterrupted run',
+  { todo: RESUME_TODO }, () => {
   const uninterrupted: SimulationLike = createHardCity(SEED_A);
   stepMonths(uninterrupted, 12 * YEARS);
 

@@ -1,16 +1,21 @@
-// Times 20 in-game years, run with npm run bench:headless
-
 import { createCity, stepMonths, Simulation } from './runner.ts';
+import type { SimulationLike } from './types.ts';
 
-const YEARS = 20;
-const SEED = 20260926;
+const YEARS: number = 20;
+const SEED: number = 20260926;
 
-const sim = createCity({ seed: SEED, level: Simulation.LEVEL_HARD, disasters: true });
+const city: SimulationLike = createCity({
+  seed: SEED,
+  level: Simulation.LEVEL_HARD,
+  disasters: true,
+});
 
-const start = process.hrtime.bigint();
-stepMonths(sim, 12 * YEARS);
-const end = process.hrtime.bigint();
+const startTime: bigint = process.hrtime.bigint();
+stepMonths(city, 12 * YEARS);
+const endTime: bigint = process.hrtime.bigint();
 
-const elapsedMs = Number(end - start) / 1e6;
+const elapsedMs: number = Number(endTime - startTime) / 1e6;
+const msPerYear: number = elapsedMs / YEARS;
 
-console.log(`Advanced ${YEARS} in-game years in ${elapsedMs.toFixed(2)} ms (${(elapsedMs / YEARS).toFixed(3)} ms/year)`);
+console.log(`Advanced ${YEARS} in-game years in ${elapsedMs.toFixed(2)} ms ` +
+  `(${msPerYear.toFixed(3)} ms/year)`);
