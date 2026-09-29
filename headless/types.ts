@@ -48,6 +48,8 @@ interface SimulationLike {
   _valves: ValvesLike;
   _census: CensusLike;
   _gameLevel: number;
+  _map: unknown;
+  blockMaps: unknown;
   getDate(): { year: number; month: number };
   forceTick(): void;
   setSpeed(speed: number): void;
