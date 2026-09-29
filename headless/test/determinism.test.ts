@@ -5,10 +5,16 @@ import assert from 'node:assert/strict';
 import { createCity, stepMonths, getState, saveCity, loadCity, Simulation } from '../runner.ts';
 import { hashCity } from '../hash.ts';
 import type { CityState, SaveData, SimulationLike } from '../types.ts';
+import { GameTools } from '../../src/gameTools.js';
 
 interface YearRecord {
   hash: string;
   state: CityState;
+}
+
+interface ToolLike {
+  doTool(x: number, y: number, blockMaps: unknown): void;
+  modifyIfEnoughFunding(budget: unknown): boolean;
 }
 
 const YEARS: number = 20;
@@ -17,6 +23,37 @@ const SEED_B: number = 197001;
 
 function createHardCity(seed: number): SimulationLike {
   return createCity({ seed: seed, level: Simulation.LEVEL_HARD, disasters: true });
+}
+
+/* A coal plant, a road with zones on both sides and a power line, so that
+ * growth, traffic, power and the budget run too. A few placements fail
+ * where the land is not clear, which is fine for this test. */
+function createDevelopedCity(seed: number): SimulationLike {
+  const city: SimulationLike = createCity({ seed: seed, level: Simulation.LEVEL_EASY, disasters: true });
+  const tools: Record<string, ToolLike> = GameTools(city._map);
+  const roadY: number = 50;
+
+  function build(toolName: string, x: number, y: number): void {
+    tools[toolName].doTool(x, y, city.blockMaps);
+    tools[toolName].modifyIfEnoughFunding(city.budget);
+  }
+
+  for (let x: number = 40; x <= 80; x++) {
+    build('road', x, roadY);
+  }
+
+  build('coal', 40, roadY - 3);
+
+  for (let x: number = 43; x <= 78; x += 3) {
+    build(x % 9 === 0 ? 'commercial' : 'residential', x, roadY - 2);
+    build(x % 2 === 0 ? 'industrial' : 'residential', x, roadY + 2);
+  }
+
+  for (let x: number = 42; x <= 80; x++) {
+    build('wire', x, roadY - 4);
+  }
+
+  return city;
 }
 
 function recordYears(city: SimulationLike, years: number): YearRecord[] {
@@ -46,6 +83,16 @@ test('different seeds: final state differs', () => {
   const secondRun: YearRecord[] = recordYears(createHardCity(SEED_B), YEARS);
 
   assert.notEqual(firstRun[YEARS - 1].hash, secondRun[YEARS - 1].hash);
+});
+
+test('developed city: same seed gives the same run for 20 years', () => {
+  const firstRun: YearRecord[] = recordYears(createDevelopedCity(SEED_A), YEARS);
+  const secondRun: YearRecord[] = recordYears(createDevelopedCity(SEED_A), YEARS);
+
+  assert.deepEqual(firstRun, secondRun);
+
+  // Otherwise the layout never grew and the test proves nothing
+  assert.ok(firstRun[YEARS - 1].state.population > 0);
 });
 
 test('save/load: a loaded city keeps the disasters option', () => {
