@@ -13,10 +13,19 @@ interface CensusLike {
   unpoweredZoneCount: number;
 }
 
+// The three percents are fractions from 0 to 1 in the engine
 interface BudgetLike {
   awaitingValues: boolean;
+  autoBudget: boolean;
   totalFunds: number;
   cityTax: number;
+  roadPercent: number;
+  firePercent: number;
+  policePercent: number;
+  setTax(rate: number): void;
+  setFunds(amount: number): void;
+  setAutoBudget(enabled: boolean): void;
+  updateFundEffects(): void;
 }
 
 interface EvaluationLike {
@@ -77,6 +86,29 @@ interface SaveData {
   [key: string]: unknown;
 }
 
+type ActionFailure =
+  | 'unknown-tool'
+  | 'invalid-position'
+  | 'invalid-value'
+  | 'insufficient-funds'
+  | 'occupied'
+  | 'blocked'
+  | 'nothing-to-bulldoze';
+
+// The cost is what was really spent, so it is 0 when the action fails
+interface ActionResult {
+  success: boolean;
+  cost: number;
+  reason: ActionFailure | null;
+}
+
+// Whole numbers from 0 to 100, like the sliders in the budget window
+interface BudgetPercentages {
+  road: number;
+  fire: number;
+  police: number;
+}
+
 interface CreateCityOptions {
   seed: number;
   level: number;
@@ -110,7 +142,10 @@ interface CityState {
 }
 
 export type {
+  ActionFailure,
+  ActionResult,
   BudgetLike,
+  BudgetPercentages,
   CensusLike,
   CityDate,
   CityState,
