@@ -11,13 +11,8 @@ import {
   Simulation,
 } from '../runner.ts';
 import { hashCity } from '../hash.ts';
-import { getTools } from '../engine.ts';
-import type {
-  CityState,
-  SaveData,
-  SimulationLike,
-  ToolMap,
-} from '../types.ts';
+import { createDevelopedCity } from './helpers/cities.ts';
+import type { CityState, SaveData, SimulationLike } from '../types.ts';
 
 interface YearRecord {
   hash: string;
@@ -35,41 +30,6 @@ function createHardCity(seed: number): SimulationLike {
     level: Simulation.LEVEL_HARD,
     disasters: true,
   });
-}
-
-/* A coal plant, a road with zones on both sides and a power line, so that
- * growth, traffic, power and the budget run too. A few placements fail
- * where the land is not clear, which is fine for this test. */
-function createDevelopedCity(seed: number): SimulationLike {
-  const city: SimulationLike = createCity({
-    seed: seed,
-    level: Simulation.LEVEL_EASY,
-    disasters: true,
-  });
-  const tools: ToolMap = getTools(city);
-  const roadY: number = 50;
-
-  function build(toolName: string, x: number, y: number): void {
-    tools[toolName].doTool(x, y, city.blockMaps);
-    tools[toolName].modifyIfEnoughFunding(city.budget);
-  }
-
-  for (let x: number = 40; x <= 80; x++) {
-    build('road', x, roadY);
-  }
-
-  build('coal', 40, roadY - 3);
-
-  for (let x: number = 43; x <= 78; x += 3) {
-    build(x % 9 === 0 ? 'commercial' : 'residential', x, roadY - 2);
-    build(x % 2 === 0 ? 'industrial' : 'residential', x, roadY + 2);
-  }
-
-  for (let x: number = 42; x <= 80; x++) {
-    build('wire', x, roadY - 4);
-  }
-
-  return city;
 }
 
 function recordYears(city: SimulationLike, years: number): YearRecord[] {
