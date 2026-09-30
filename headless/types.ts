@@ -22,6 +22,8 @@ interface BudgetLike {
   roadPercent: number;
   firePercent: number;
   policePercent: number;
+  taxFund: number;
+  doBudgetWindow(): void;
   setTax(rate: number): void;
   setFunds(amount: number): void;
   setAutoBudget(enabled: boolean): void;
@@ -109,6 +111,20 @@ interface BudgetPercentages {
   police: number;
 }
 
+/* One answered budget window. The funds are from before the yearly taxes
+ * and spending, fundsAfter from after them. Road, fire and police are the
+ * percent of full funding the city could pay. */
+interface BudgetWindowRecord {
+  date: CityDate;
+  funds: number;
+  taxes: number;
+  fundsAfter: number;
+  road: number;
+  fire: number;
+  police: number;
+  autoBudgetWasOn: boolean;
+}
+
 interface CreateCityOptions {
   seed: number;
   level: number;
@@ -146,6 +162,7 @@ export type {
   ActionResult,
   BudgetLike,
   BudgetPercentages,
+  BudgetWindowRecord,
   CensusLike,
   CityDate,
   CityState,

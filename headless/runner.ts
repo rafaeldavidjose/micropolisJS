@@ -2,6 +2,7 @@ import { GameMap } from '../src/gameMap.js';
 import { MapGenerator } from '../src/mapGenerator.js';
 import { Simulation } from '../src/simulation.js';
 import { Random } from '../src/random.ts';
+import { answerBudgetWindow } from './budget.ts';
 import { getCensus, getValves } from './engine.ts';
 import type {
   CensusLike,
@@ -45,12 +46,14 @@ function stepMonths(city: SimulationLike, monthCount: number): void {
   const tickCount: number = monthCount * TICKS_PER_MONTH;
 
   for (let tick: number = 0; tick < tickCount; tick++) {
+    // The engine turns auto budget off in the tick that opens the window
+    const autoBudgetWasOn: boolean = city.budget.autoBudget;
+
     city.forceTick();
 
-    // forceTick does nothing while this is set, and no UI can clear it
+    // forceTick does nothing while this is set, so answer it right away
     if (city.budget.awaitingValues) {
-      throw new Error('The budget is waiting for player input, ' +
-        'time cannot advance');
+      answerBudgetWindow(city, autoBudgetWasOn);
     }
   }
 }
