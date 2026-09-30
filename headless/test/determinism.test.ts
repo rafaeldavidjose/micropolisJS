@@ -11,17 +11,17 @@ import {
   Simulation,
 } from '../runner.ts';
 import { hashCity } from '../hash.ts';
-import type { CityState, SaveData, SimulationLike } from '../types.ts';
-import { GameTools } from '../../src/gameTools.js';
+import { getTools } from '../engine.ts';
+import type {
+  CityState,
+  SaveData,
+  SimulationLike,
+  ToolMap,
+} from '../types.ts';
 
 interface YearRecord {
   hash: string;
   state: CityState;
-}
-
-interface ToolLike {
-  doTool(x: number, y: number, blockMaps: unknown): void;
-  modifyIfEnoughFunding(budget: unknown): boolean;
 }
 
 const YEARS: number = 20;
@@ -46,7 +46,7 @@ function createDevelopedCity(seed: number): SimulationLike {
     level: Simulation.LEVEL_EASY,
     disasters: true,
   });
-  const tools: Record<string, ToolLike> = GameTools(city._map);
+  const tools: ToolMap = getTools(city);
   const roadY: number = 50;
 
   function build(toolName: string, x: number, y: number): void {
