@@ -41,14 +41,27 @@ interface CityDate {
   month: number;
 }
 
+// A tool from src/gameTools.js. Only building tools have a size
+interface ToolLike {
+  result: number | null;
+  size?: number;
+  TOOLRESULT_OK: number;
+  TOOLRESULT_FAILED: number;
+  TOOLRESULT_NO_MONEY: number;
+  TOOLRESULT_NEEDS_BULLDOZE: number;
+  doTool(x: number, y: number, blockMaps: unknown): void;
+  modifyIfEnoughFunding(budget: BudgetLike): boolean;
+  clear(): void;
+}
+
+type ToolMap = Record<string, ToolLike>;
+
+// The private fields are read in engine.ts only
 interface SimulationLike {
   budget: BudgetLike;
   evaluation: EvaluationLike;
   disasterManager: DisasterManagerLike;
   blockMaps: unknown;
-  _valves: ValvesLike;
-  _census: CensusLike;
-  _map: unknown;
   getDate(): CityDate;
   forceTick(): void;
   setSpeed(speed: number): void;
@@ -97,9 +110,14 @@ interface CityState {
 }
 
 export type {
+  BudgetLike,
   CensusLike,
+  CityDate,
   CityState,
   CreateCityOptions,
   SaveData,
   SimulationLike,
+  ToolLike,
+  ToolMap,
+  ValvesLike,
 };

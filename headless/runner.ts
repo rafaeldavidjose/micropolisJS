@@ -2,12 +2,14 @@ import { GameMap } from '../src/gameMap.js';
 import { MapGenerator } from '../src/mapGenerator.js';
 import { Simulation } from '../src/simulation.js';
 import { Random } from '../src/random.ts';
+import { getCensus, getValves } from './engine.ts';
 import type {
   CensusLike,
   CityState,
   CreateCityOptions,
   SaveData,
   SimulationLike,
+  ValvesLike,
 } from './types.ts';
 
 // Same defaults as MapGenerator and GameMap
@@ -71,7 +73,8 @@ function getFireSeverity(census: CensusLike): number {
 }
 
 function getState(city: SimulationLike): CityState {
-  const census: CensusLike = city._census;
+  const census: CensusLike = getCensus(city);
+  const valves: ValvesLike = getValves(city);
 
   return {
     date: city.getDate(),
@@ -81,9 +84,9 @@ function getState(city: SimulationLike): CityState {
     cityClass: city.evaluation.cityClass,
     approval: city.evaluation.cityYes,
     rci: {
-      residential: city._valves.resValve,
-      commercial: city._valves.comValve,
-      industrial: city._valves.indValve,
+      residential: valves.resValve,
+      commercial: valves.comValve,
+      industrial: valves.indValve,
     },
     problems: {
       crime: census.crimeAverage,
