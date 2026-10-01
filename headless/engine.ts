@@ -6,20 +6,17 @@ import { BaseTool } from '../src/baseTool.js';
 import { GameTools } from '../src/gameTools.js';
 import type {
   CensusLike,
+  MapLike,
   SimulationLike,
   ToolMap,
   ValvesLike,
 } from './types.ts';
 
-interface MapLike {
-  width: number;
-  height: number;
-}
-
 interface EnginePrivates {
   _map: MapLike;
   _census: CensusLike;
   _valves: ValvesLike;
+  _constructSimData(): unknown;
 }
 
 const toolsByCity: WeakMap<SimulationLike, ToolMap> = new WeakMap();
@@ -43,6 +40,13 @@ function getValves(city: SimulationLike): ValvesLike {
   return privates(city)._valves;
 }
 
+/* Moves every sprite one step, as the browser does once per animation
+ * frame. Calls Simulation._constructSimData, which builds the same data the
+ * browser passes. */
+function moveSprites(city: SimulationLike): void {
+  city.spriteManager.moveObjects(privates(city)._constructSimData());
+}
+
 /* The tools hold the map, so there is one set per city. Auto bulldoze is a
  * flag shared by the whole process, so it is set on every call to keep it
  * the same in every run. */
@@ -61,4 +65,4 @@ function getTools(city: SimulationLike): ToolMap {
   return tools;
 }
 
-export { getMap, getCensus, getValves, getTools };
+export { getMap, getCensus, getValves, getTools, moveSprites };

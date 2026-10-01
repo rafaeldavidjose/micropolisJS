@@ -16,7 +16,7 @@ Run `npm install` once. It installs `tsx`, which runs the TypeScript files
 directly.
 
 ```sh
-npm run test:headless   # determinism, action and budget tests (node:test)
+npm run test:headless   # determinism, action, budget and sprite tests (node:test)
 npm run bench:headless  # times 20 in-game years
 ```
 
@@ -49,6 +49,9 @@ one phase of the engine's cycle. 16 phases make one time unit and 4 time
 units make one month. If the city cannot pay for its services, the engine
 stops and waits for the player to answer the budget window. `stepMonths`
 answers it and goes on, see "Budget window" below.
+
+After every `forceTick()`, `stepMonths` also moves the sprites 3 times,
+see "Sprites" below.
 
 Two engine settings are fixed in headless.
 
@@ -211,10 +214,11 @@ read 0 until the first tick. For a city with no population the yearly
 evaluation only resets itself, so the score stays at 500 and approval at
 50.
 
-`_valves`, `_census` and `_map` are private fields of the engine. The
-underscore is only a naming convention there, and adding getters to the
-engine just for this seemed unnecessary. `engine.ts` is the only file
-that reads them, and it also keeps the engine's tools for each city.
+`_valves`, `_census` and `_map` are private fields of the engine, and
+`_constructSimData` is a private method. The underscore is only a naming
+convention there, and adding getters to the engine just for this seemed
+unnecessary. `engine.ts` is the only file that uses them, and it also
+keeps the engine's tools for each city.
 
 ## Determinism
 
@@ -230,13 +234,18 @@ The tests in `test/determinism.test.ts` check that:
 
 The actions are tested in `test/actions.test.ts` and the budget window in
 `test/budget.test.ts`. Both also check that the same actions give the same
-city and the same budget log twice.
+city and the same budget log twice. `test/sprites.test.ts` puts a tornado
+on the developed city and checks that it moves, that it destroys road and
+that the same run twice gives the same city every month.
 
-On an empty map only the disaster code uses random numbers. With the test
-seed, only 41 of the 12,000 tiles change in 20 years. That is why the developed city test
-exists. It places a coal plant, a road, zones on both sides and a power
-line with `build`, so growth, traffic, power and the budget run as well. The test also checks that the
-population grew, otherwise it would prove nothing.
+On an empty map only the disaster code and the sprites use random
+numbers. With the test seed, only 31 of the 12,000 tiles change in 20
+years. That is why the developed city test exists. It places a coal plant,
+a road, zones on both sides and a power line with `build`, so growth,
+traffic, power and the budget run as well. The test also checks that the
+population grew, otherwise it would prove nothing. The developed city has
+disasters off. Its coal plant pushes average pollution above 60, and with
+disasters on a monster appears in month 28 and destroys the power supply.
 
 I also checked by hand that the same seed gives the same hash in two
 separate Node processes.
@@ -257,24 +266,42 @@ The reasons are in the engine and are listed in `CHANGES.md`. The last test
 asserts that both runs match and is marked as todo, so it shows up in the
 output without failing the suite.
 
+Sprites are not part of the save data. A tornado, monster, train, plane,
+helicopter, ship or explosion that exists when the city is saved is gone
+after loading. The browser loses them in the same way.
+
+## Sprites
+
+Tornadoes, monsters, trains, planes, helicopters, ships and explosions are
+sprites. They only move in `SpriteManager.moveObjects()`, and they do all
+their damage while moving: a tornado or monster destroys the tile under
+it, and an explosion starts its fires when it ends. The browser calls
+`moveObjects()` once per animation frame in `src/game.js`, never in the
+simulation tick, so how often sprites move per phase depends on the
+screen's frame rate.
+
+The original game calls `MoveObjects()` on every pass of its loop
+(`sim_loop` in `sim.c`), and `SimFrame()` in `s_sim.c` runs a phase only
+on every fifth, third or first pass at slow, medium and fast speed. At
+medium speed, which the runner uses, that is 3 moves per phase.
+`stepMonths` therefore calls `moveObjects()` 3 times after every
+`forceTick()`, through `moveSprites` in `engine.ts`. The sprites take
+numbers from the shared random generator, so the runs stay reproducible.
+
+Without this, a tornado stayed where it appeared for good and changed no
+tile. With it, a tornado placed on the developed city crossed it and left
+the map within 5 months.
+
 ## Performance
 
 `npm run bench:headless` advances a hard city with disasters on for 20
-years. Over five runs it took between 110 and 112 ms, about 5.5 ms per
-year. I measured this with Node 24.15.0 on an Intel Core Ultra 7 258V on
-Windows 11. The map is empty, so a developed city does more work per tick
-and will be slower.
+years. Over five runs it took between 123 and 131 ms, about 6.3 ms per
+year, measured with Node 24.14.1 on an AMD Ryzen 9 7900X3D on Windows 11.
+Before the sprites moved it took between 122 and 132 ms on the same
+machine, so moving them costs nothing measurable. The map is empty, so a
+developed city does more work per tick and will be slower.
 
 ## Things to keep in mind
-
-Tornado and monster disasters create a sprite, but sprites only move when
-`SpriteManager.moveObjects()` runs. In the browser that happens in
-`Game.js`'s animation loop, never in the simulation tick, and the runner
-does not call it either. A tornado therefore stays where it appears and
-does no further damage. A monster needs average pollution above 60, so it
-never appears on an empty map. I left this as it is because calling
-`moveObjects()` would mean choosing a number of calls per tick that the
-engine does not define.
 
 In `src/evaluation.js`, every yearly evaluation of a city with population
 adds 7 entries to a module level array that is never cleared. The array is

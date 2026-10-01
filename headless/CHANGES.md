@@ -109,6 +109,9 @@ with an uninterrupted run. These come from the engine:
   that draws random numbers in `doVotes` and `voteProblems`. For the empty
   test city it draws nothing, because the evaluation only resets when the
   population is 0.
+- Sprites are not in the save data. A tornado, monster, train, plane,
+  helicopter, ship or explosion that exists when the city is saved is gone
+  after loading. The browser loses them in the same way.
 
 An earlier version of this file named only the last point as the cause.
 That was wrong for the tested city.
