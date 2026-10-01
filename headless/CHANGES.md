@@ -76,7 +76,7 @@ the build or Jest.
 
 ### 6. jest.config.js renamed to jest.config.cjs
 
-Commit `4a3aea3`.
+Commit `96c9d70`.
 
 `package.json` sets `"type": "module"`, which upstream added, so Node
 treats every `.js` file as an ES module. `jest.config.js` uses
