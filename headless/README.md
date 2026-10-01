@@ -10,6 +10,12 @@ budget, the same things a player does in the browser.
 The engine changes this needed are listed in `CHANGES.md`. The actions and
 the budget handling needed none.
 
+The runner must behave like micropolisJS in the browser. `src/` is only
+changed when something stops the game from running headless. Game bugs,
+also porting bugs from the original Micropolis, are left as they are and
+listed under "Known porting bugs" in `CHANGES.md`, with the original
+lines.
+
 ## Running
 
 Run `npm install` once. It installs `tsx`, which runs the TypeScript files
@@ -212,7 +218,16 @@ evaluation, it reads 0.
 Approval and population are not saved either. Right after `loadCity` they
 read 0 until the first tick. For a city with no population the yearly
 evaluation only resets itself, so the score stays at 500 and approval at
-50.
+50. The first year of a new city is different: the constructor sets the
+census population to 1, so the extra evaluation on the first tick runs in
+full. With the test seed an empty city shows a score of 701 and approval
+63 until the first January.
+
+Score, approval and the problem values change once a year, at the
+evaluation in January. Population changes every month, because the
+monthly growth check recomputes it. That check also sets the change in
+population that the score uses, so the score sees the change over the last
+month, not over the year (see "Things to keep in mind").
 
 `_valves`, `_census` and `_map` are private fields of the engine, and
 `_constructSimData` is a private method. The underscore is only a naming
@@ -302,6 +317,22 @@ machine, so moving them costs nothing measurable. The map is empty, so a
 developed city does more work per tick and will be slower.
 
 ## Things to keep in mind
+
+The score has three porting bugs, left as they are and described in
+`CHANGES.md` under "Known porting bugs". Police and fire funding never
+change it: the penalty reads constant names that `Budget` does not
+define. Any drop in population in the last month before January halves
+it. And it rounds where the original cuts toward zero, and caps the
+problems at 250 instead of 256. For an agent this means the score rewards
+a population that does not dip just before January more than it rewards
+good services, and it is noisy from year to year.
+
+The disasters have six more, also described there. A flood can start on
+any bulldozable tile next to water but never on bare land without flags.
+Planes never collide. An explosion lights only its own tile instead of
+that tile and the four diagonal neighbours. Ships wreck on land with
+disasters off. Fire never spreads. And a burning or flooded zone marks
+the wrong tiles bulldozable.
 
 In `src/evaluation.js`, every yearly evaluation of a city with population
 adds 7 entries to a module level array that is never cleared. The array is
