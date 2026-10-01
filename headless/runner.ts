@@ -27,10 +27,9 @@ const PHASES_PER_TIME_UNIT: number = 16;
 const TIME_UNITS_PER_MONTH: number = 4;
 const TICKS_PER_MONTH: number = PHASES_PER_TIME_UNIT * TIME_UNITS_PER_MONTH;
 
-/* The original game calls MoveObjects on every pass of its loop and runs a
- * phase on every third pass at medium speed, so sprites move 3 times per
- * phase. The browser moves them once per animation frame instead, which
- * depends on the screen. */
+/* The browser moves sprites once per animation frame. At medium speed it
+ * runs a phase every 50 ms, so a 60 Hz screen gives 3 moves per phase. The
+ * original game also makes 3 at medium speed. */
 const SPRITE_MOVES_PER_TICK: number = 3;
 
 // The engine keeps no seed, saveCity needs it to make loads reproducible
