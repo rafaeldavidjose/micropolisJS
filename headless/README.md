@@ -154,9 +154,11 @@ budget window, and the simulation waits until the player answers. Funds
 never go below 0, and tools refuse to build without money.
 
 `stepMonths` answers that window the way a player does who presses OK
-without changing anything. It calls the engine's `doBudgetWindow`, which
-accepts the percentages the engine proposed, and goes on. It adds no rule
-of its own and nothing ends the game.
+without changing anything. The browser shows each percentage floored to a
+whole number (`handleBudgetRequest` in `src/game.js`), and OK writes those
+numbers back divided by 100 before it calls the engine's `doBudgetWindow`
+(`handleBudgetWindowClosure`). `stepMonths` does the same and goes on. It
+adds no rule of its own and nothing ends the game.
 
 The engine never turns auto budget back on by itself. With auto budget
 off it opens the window every January, also in years with enough money.
@@ -186,9 +188,10 @@ that it is false, and a shortage has to be read from the funds and the
 percentages. The log is kept in memory for each city. It is not part of
 the save data or of the hash, so a loaded city starts with an empty log.
 
-In the browser the window shows the percentages as whole numbers, so a
-player who presses OK accepts them rounded down. `stepMonths` accepts the
-engine's own values, which have two significant digits.
+The flooring only matters when a percentage has a fraction, like 0.052,
+or falls just under a whole number in floating point, like 0.29, which
+`Math.floor(0.29 * 100)` turns into 28. In the test cities it changed no
+record of the log.
 
 ## State
 
