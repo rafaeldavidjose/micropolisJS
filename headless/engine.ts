@@ -1,6 +1,6 @@
-/* The only file that reads private engine fields. The underscore is just a
- * naming convention in the engine and JS does not enforce it. Adding getters
- * to src/ only for headless/ seemed unnecessary. */
+/* The only file that uses private engine fields and methods. The underscore
+ * is just a naming convention in the engine and JS does not enforce it.
+ * Adding getters to src/ only for headless/ seemed unnecessary. */
 
 import { BaseTool } from '../src/baseTool.js';
 import { GameTools } from '../src/gameTools.js';
@@ -25,24 +25,19 @@ function privates(city: SimulationLike): EnginePrivates {
   return city as unknown as EnginePrivates;
 }
 
-// Reads Simulation._map
 function getMap(city: SimulationLike): MapLike {
   return privates(city)._map;
 }
 
-// Reads Simulation._census
 function getCensus(city: SimulationLike): CensusLike {
   return privates(city)._census;
 }
 
-// Reads Simulation._valves
 function getValves(city: SimulationLike): ValvesLike {
   return privates(city)._valves;
 }
 
-/* Moves every sprite one step, as the browser does once per animation
- * frame. Calls Simulation._constructSimData, which builds the same data the
- * browser passes. */
+// One step for every sprite, with the same data the browser passes
 function moveSprites(city: SimulationLike): void {
   city.spriteManager.moveObjects(privates(city)._constructSimData());
 }

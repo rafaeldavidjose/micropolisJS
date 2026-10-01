@@ -7,8 +7,9 @@ summary of its state. The same seed always gives the same result. A small
 set of actions lets a program build, bulldoze and set the taxes and the
 budget, the same things a player does in the browser.
 
-The engine changes this needed are listed in `CHANGES.md`. The actions and
-the budget handling needed none.
+The fork is based on graememcc/micropolisJS at commit `f13a162` (13 July
+2025). The engine changes this needed are listed in `CHANGES.md`. The
+actions and the budget handling needed none.
 
 The runner must behave like micropolisJS in the browser. `src/` is only
 changed when something stops the game from running headless. Game bugs,
@@ -298,12 +299,13 @@ it, and an explosion starts its fires when it ends. The browser calls
 simulation tick, so how often sprites move per phase depends on the
 screen's frame rate.
 
-The original game calls `MoveObjects()` on every pass of its loop
-(`sim_loop` in `sim.c`), and `SimFrame()` in `s_sim.c` runs a phase only
-on every fifth, third or first pass at slow, medium and fast speed. At
-medium speed, which the runner uses, that is 3 moves per phase.
-`stepMonths` therefore calls `moveObjects()` 3 times after every
-`forceTick()`, through `moveSprites` in `engine.ts`. The sprites take
+`stepMonths` calls `moveObjects()` 3 times after every `forceTick()`,
+through `moveSprites` in `engine.ts`. At the default medium speed the
+browser runs a phase every 50 ms, and a 60 Hz screen draws a frame about
+every 17 ms, so a player sees 3 moves per phase. The original game also
+makes 3 at medium speed: it calls `MoveObjects()` on every pass of its
+loop (`sim_loop` in `sim.c`), and `SimFrame()` in `s_sim.c` runs a phase
+only on every third pass. The sprites take
 numbers from the shared random generator, so the runs stay reproducible.
 
 Without this, a tornado stayed where it appeared for good and changed no

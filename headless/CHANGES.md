@@ -1,6 +1,7 @@
 # Changes outside headless/
 
-Each change is its own commit so I can cite it on its own.
+This fork is based on graememcc/micropolisJS at commit `f13a162`
+(13 July 2025). Each change is its own commit so I can cite it on its own.
 
 ## Rule
 
@@ -40,8 +41,14 @@ stopped after about one month. The bug was already in upstream.
 In the browser it most likely did not throw. `index.html` has an element
 with `id="budget"`, and browsers make element ids available as global
 variables, so `budget` pointed at that element. `take10Census` then read
-`cashFlow` from it, got `undefined`, and stored `NaN` in the money history
-used by the graphs. I have not checked this in a browser.
+`cashFlow` from it, got `undefined`, and stored `NaN` in the money history.
+I have not checked this in a browser.
+
+Either way the fix does not change the simulation. `budget` is only used
+for `moneyHist10`, which `take120Census` copies into `moneyHist120`.
+Nothing in micropolisJS reads either array. They are saved with the city,
+and in the original they feed the graphs, which micropolisJS never
+implemented (`// TODO Graphs` in `simTick`).
 
 ### 3. src/random.ts: optional seeded generator
 
