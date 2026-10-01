@@ -3,7 +3,7 @@ import { MapGenerator } from '../src/mapGenerator.js';
 import { Simulation } from '../src/simulation.js';
 import { Random } from '../src/random.ts';
 import { answerBudgetWindow } from './budget.ts';
-import { getCensus, getValves } from './engine.ts';
+import { getCensus, getValves, moveSprites } from './engine.ts';
 import type {
   CensusLike,
   CityState,
@@ -26,6 +26,12 @@ const HEADLESS_SPEED: number = Simulation.SPEED_MED;
 const PHASES_PER_TIME_UNIT: number = 16;
 const TIME_UNITS_PER_MONTH: number = 4;
 const TICKS_PER_MONTH: number = PHASES_PER_TIME_UNIT * TIME_UNITS_PER_MONTH;
+
+/* The original game calls MoveObjects on every pass of its loop and runs a
+ * phase on every third pass at medium speed, so sprites move 3 times per
+ * phase. The browser moves them once per animation frame instead, which
+ * depends on the screen. */
+const SPRITE_MOVES_PER_TICK: number = 3;
 
 // The engine keeps no seed, saveCity needs it to make loads reproducible
 const citySeeds: WeakMap<SimulationLike, number> = new WeakMap();
@@ -54,6 +60,10 @@ function stepMonths(city: SimulationLike, monthCount: number): void {
     // forceTick does nothing while this is set, so answer it right away
     if (city.budget.awaitingValues) {
       answerBudgetWindow(city, autoBudgetWasOn);
+    }
+
+    for (let move: number = 0; move < SPRITE_MOVES_PER_TICK; move++) {
+      moveSprites(city);
     }
   }
 }

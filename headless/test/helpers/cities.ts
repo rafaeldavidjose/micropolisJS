@@ -6,12 +6,14 @@ import type { SimulationLike } from '../../types.ts';
 
 /* A coal plant, a road with zones on both sides and a power line, so that
  * growth, traffic, power and the budget run too. A few placements fail
- * where the land is not clear, which is fine for the tests. */
+ * where the land is not clear, which is fine for the tests. Disasters are
+ * off: the coal plant pushes average pollution above 60, and with the test
+ * seed a monster appears in month 28 and destroys the power supply. */
 function createDevelopedCity(seed: number): SimulationLike {
   const city: SimulationLike = createCity({
     seed: seed,
     level: Simulation.LEVEL_EASY,
-    disasters: true,
+    disasters: false,
   });
   const roadY: number = 50;
 

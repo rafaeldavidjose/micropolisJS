@@ -47,6 +47,26 @@ interface DisasterManagerLike {
   disastersEnabled: boolean;
 }
 
+interface MapLike {
+  width: number;
+  height: number;
+  getTileValue(x: number, y: number): number;
+}
+
+// Only what the runner and the tornado test use
+interface SpriteLike {
+  type: number;
+  frame: number;
+  worldX: number;
+  worldY: number;
+}
+
+interface SpriteManagerLike {
+  moveObjects(simData: unknown): void;
+  makeTornado(): void;
+  getSprite(type: number): SpriteLike | null;
+}
+
 interface CityDate {
   year: number;
   month: number;
@@ -72,6 +92,7 @@ interface SimulationLike {
   budget: BudgetLike;
   evaluation: EvaluationLike;
   disasterManager: DisasterManagerLike;
+  spriteManager: SpriteManagerLike;
   blockMaps: unknown;
   getDate(): CityDate;
   forceTick(): void;
@@ -167,8 +188,10 @@ export type {
   CityDate,
   CityState,
   CreateCityOptions,
+  MapLike,
   SaveData,
   SimulationLike,
+  SpriteLike,
   ToolLike,
   ToolMap,
   ValvesLike,
