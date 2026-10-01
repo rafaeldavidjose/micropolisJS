@@ -9,15 +9,18 @@ function toPercent(fraction: number): number {
   return Math.round(fraction * 10000) / 100;
 }
 
-/* The engine opens the budget window when the city cannot pay for its
- * services, and every January while auto budget is off. It has already
- * lowered the percentages to what the city can afford, in the order
- * roads, fire, police. doBudgetWindow accepts them, like pressing OK in
- * the browser. The game has no bankruptcy, so nothing ends here. */
+/* Does what the browser does when the player presses OK without changing
+ * anything. The window shows each percentage floored to a whole number
+ * (handleBudgetRequest in src/game.js), and OK writes those numbers back
+ * divided by 100 before calling doBudgetWindow (handleBudgetWindowClosure). */
 function answerBudgetWindow(city: SimulationLike,
     autoBudgetWasOn: boolean): void {
   const funds: number = city.budget.totalFunds;
 
+  city.budget.roadPercent = Math.floor(city.budget.roadPercent * 100) / 100;
+  city.budget.firePercent = Math.floor(city.budget.firePercent * 100) / 100;
+  city.budget.policePercent =
+    Math.floor(city.budget.policePercent * 100) / 100;
   city.budget.doBudgetWindow();
 
   const record: BudgetWindowRecord = {
