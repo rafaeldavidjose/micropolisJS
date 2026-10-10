@@ -6,6 +6,7 @@ import { parseArgs } from 'node:util';
 import { DEFAULT_OPTIONS, allBudgetWindows, runGame, writeRunLog }
   from './game.ts';
 import { Simulation } from './runner.ts';
+import { createDemoAgent } from './agents/demo.ts';
 import { passiveAgent } from './agents/passive.ts';
 import { createRandomAgent } from './agents/random.ts';
 import type { Agent, RunLog, TurnLog } from './types.ts';
@@ -53,7 +54,11 @@ function makeAgent(name: string, seed: number): Agent {
     return passiveAgent;
   }
 
-  throw new Error('Unknown agent ' + name + ', use random or passive');
+  if (name === 'demo') {
+    return createDemoAgent();
+  }
+
+  throw new Error('Unknown agent ' + name + ', use random, passive or demo');
 }
 
 if (!(values.level as string in LEVELS)) {
