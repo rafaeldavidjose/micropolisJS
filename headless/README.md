@@ -28,10 +28,11 @@ directly.
 npm run test:headless   # all headless tests (node:test)
 npm run bench:headless  # times 20 in-game years
 npm run play:headless -- --agent random --seed 3 --level hard --disasters on --out run.json
+npm run replay -- run.json  # opens the replay viewer on a run log
 ```
 
 `play:headless` plays one game and writes its run log. The options are
-`--agent` (`random` or `passive`), `--seed` for the city, `--agent-seed`
+`--agent` (`random`, `passive` or `demo`), `--seed` for the city, `--agent-seed`
 (the city seed if left out), `--level` (`easy`, `medium` or `hard`),
 `--disasters` (`on` or `off`), `--turns`, `--months` for the months per
 turn, `--max-actions` and `--out`. Left out, they take the defaults of
@@ -45,7 +46,7 @@ The tests use `node:test` because the project's Jest setup only covers
 Creating, stepping, reading, saving and loading a city is in `runner.ts`.
 The actions are in `actions.ts`, the routes in `routes.ts` and the budget
 log in `budget.ts`. The game loop is in `game.ts` and the agents are in
-`agents/`.
+`agents/`. The replay viewer is in `viewer/`, and `replay.ts` opens it.
 
 ```ts
 import { createCity, stepMonths, getState, saveCity, loadCity, Simulation }
@@ -310,10 +311,19 @@ the start, one entry per turn and the final state with the city hash.
 Each turn has the date and the state the agent saw, the map changes since
 the turn before, the actions with their results, the number of dropped
 actions, the budget windows answered while the city ran, and the agent's
-report. The map is stored as tile values, row by row, and every turn as
+report. A route action also has `tiles`, the `[x, y]` tiles of its plan.
+A route that failed for lack of money keeps them too.
+
+The map is stored row by row as raw tile values, with the flag bits of
+`src/tileFlags.ts`, for example power and zone centre. Every turn stores
 a list of `[index, value]` changes, so a replay can rebuild the map of
-any turn. A 20 year log is about 60 kB for the passive agent and 90 to
-100 kB for the random agent. `recordMap: false` leaves the map out.
+any turn. The agent's view gives the tile number without the flags, like
+`getTileValue` in the engine. A 20 year log is about 70 kB for the
+passive agent and 95 to 120 kB for the random and the demo agent.
+`recordMap: false` leaves the map out.
+
+The log has a `version`, now 2. Version 1 logs had tile numbers without
+the flags and no route tiles.
 
 `agents/passive.ts` has the passive agent, which does nothing.
 
@@ -350,6 +360,100 @@ draws never move the game's sequence. The park tool and the bulldozer
 still draw from the game's generator when one of their actions is
 applied. A run stays reproducible, since the same seeds give the same
 actions at the same points.
+
+## Demo agent
+
+```ts
+import { createDemoAgent } from './agents/demo.ts';
+
+const log = await runGame(createDemoAgent(), { seed: 1 });
+```
+
+The demo agent builds the same small town on every map, so the replay
+viewer has a city that grows. It is not one of the baselines and takes no
+part in the experiments.
+
+On its first turn it picks a site of 31 by 14 tiles of bare land, shore,
+trees or rubble, the one closest to the centre of the map. The plan is
+fixed, in tiles from the corner of the site. In the first year it builds
+a coal plant, a power line, a street and eight zones. A police and a fire
+station follow in year 3 and six more zones in year 4. A second street
+with eight zones comes in year 6, and six more zones with a second police
+and fire station in year 8. It builds up to the action limit of the turn,
+waits while money is short, and skips a step the engine refuses.
+
+With the default options the town has between 5,800 and 9,500 people
+after 20 years on seeds 1 to 10, except seed 3. That map is islands, no
+site fits, and the town never gets power.
+
+## Replay viewer
+
+```sh
+npm run replay -- run.json  # a log from play:headless or writeRunLog
+npm run replay              # plays a game with the demo agent and shows it
+```
+
+`replay.ts` starts a small server on 127.0.0.1 and opens the viewer in
+the browser. It prints the address. `--port` picks the port and
+`--no-open` leaves the browser closed. The log is read again on every
+reload. The page is in `viewer/` and has no build step. It loads nothing
+from the internet, so it works offline. Another log can be opened with
+Open log or dropped on the page. The page needs the server, because
+browsers do not load its JavaScript modules from a `file://` address.
+
+The map is drawn with `images/tiles.png`, the tile sheet of the browser
+game. Each raw value is masked with `BIT_MASK` to get the tile number, as
+the engine does. A zone centre without power shows the lightning bolt the
+browser blinks there, without the blinking. The Unpowered zones checkbox
+turns it off. Nothing else is animated either.
+
+The timeline has a slider, buttons to step one turn back and forward,
+and Play with a speed from 0.5 to 16 turns per second. The arrow keys
+step, Home and End jump to the start and the end, and Space plays and
+pauses. The wheel zooms around the pointer, dragging pans, and Fit shows
+the whole map again.
+
+Each turn shows the map the agent saw at the start of the turn. With Map
+after the turn it shows the map at the start of the next turn instead,
+with the new buildings. The actions of the turn are marked on the map
+with their number. A building or a bulldozed tile is outlined over its
+site, and a route is drawn along its tiles. Successful actions are solid
+green, failed ones dashed red with their reason. A route without a plan
+is drawn as a straight line between its ends. The list on the left has
+every action of the turn with its cost or its reason. Clicking an action
+in the list or on the map selects it, fades the others and brings it
+into view.
+
+The panel on the right has the state at the start of the turn: date,
+funds, population, score, city class, approval, tax rate, powered zones,
+RCI demand and the seven problems, then the budget windows answered
+during the turn and the agent's report. Two line charts show the
+population and the funds over the whole game with a marker at the turn.
+Clicking a chart jumps to that point. Hovering a tile shows its
+coordinates and what it is. The kind comes from the tile ranges of the
+query tool (`classifyZone` in `src/queryTool.js`). A detail is added
+where the tile number says more, like shore, bridge, traffic, empty zone,
+hospital or church, and the flags add the zone centre and the power. The
+top bar has the agent, the seeds, the level, the disasters option, the
+months per turn, the number of turns and the action limit.
+
+Tornadoes, monsters, planes, helicopters, ships and trains are sprites,
+and sprites are not in the log. The viewer cannot show them and says so
+on the map. The damage they do is in the tiles.
+
+`viewer/replay.js` rebuilds the map of a turn from the first map and the
+changes. It keeps a full copy every 16 turns, so a jump replays at most
+15 turns of changes. In Chrome a jump takes about 1.4 ms with the
+drawing. `test/replay.test.ts` plays the demo town for 10 years, plays
+the same city again from the actions in the log, and checks that the map
+rebuilt for every turn matches the real map at that turn, flags
+included. It takes the turns in an order that jumps around. The numbers
+the viewer needs from `src/tileValues.ts` and `src/tileFlags.ts` are
+copied into `viewer/tiles.js`, because the browser cannot load the
+TypeScript files. The test checks them against the engine.
+
+Version 1 logs open too. They have no flags, so no power is shown, and
+their routes are straight lines between the ends.
 
 ## Budget window
 
