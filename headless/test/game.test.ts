@@ -13,6 +13,7 @@ import { passiveAgent } from '../agents/passive.ts';
 import type {
   ActionResult,
   Agent,
+  AppliedAction,
   CityView,
   GameAction,
   MapLike,
@@ -59,7 +60,7 @@ function readTiles(map: MapLike): number[] {
 
   for (let y: number = 0; y < map.height; y++) {
     for (let x: number = 0; x < map.width; x++) {
-      tiles.push(map.getTileValue(x, y));
+      tiles.push(map.getTile(x, y).getRawValue());
     }
   }
 
@@ -101,6 +102,16 @@ test('game: actions are applied in order and their results kept', async () => {
     (result: ActionResult): string | null => result.reason),
     ['unknown-action', 'unknown-tool', 'invalid-position', 'invalid-value',
       'unknown-action']);
+
+  // Only the routes keep their tiles, from one endpoint to the other
+  const road: AppliedAction = log.turns[0].actions[3];
+  assert.equal(road.tiles?.length, 8);
+  assert.deepEqual(road.tiles?.[0], [55, 49]);
+  assert.deepEqual(road.tiles?.[7], [62, 49]);
+  assert.ok(log.turns[0].actions[2].tiles !== undefined);
+  assert.equal(log.turns[0].actions.filter(
+    (applied: AppliedAction): boolean => applied.tiles !== undefined).length,
+    2);
 });
 
 test('game: actions past the limit are dropped and counted', async () => {

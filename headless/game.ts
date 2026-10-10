@@ -29,12 +29,13 @@ import type {
   MapView,
   Position,
   RoutePlan,
+  RouteTile,
   RunLog,
   SimulationLike,
   TurnLog,
 } from './types.ts';
 
-const LOG_VERSION: number = 1;
+const LOG_VERSION: number = 2;
 
 /* Provisional until the experiment is designed. Level and disasters are
  * what a new game starts with in the browser. 80 turns of 3 months are 20
@@ -139,12 +140,39 @@ function applyAction(city: SimulationLike, action: unknown): ActionResult {
   }
 }
 
+/* Like applyAction, but a route also keeps the tiles of its plan, so a
+ * replay can draw it. A route that failed for lack of money keeps the
+ * tiles it would have taken. */
+function playAction(city: SimulationLike, action: unknown): AppliedAction {
+  const a: GameAction = action as GameAction;
+
+  if (typeof action !== 'object' || action === null || a.type !== 'route' ||
+      !isPosition(a.from) || !isPosition(a.to)) {
+    return { action: action, result: applyAction(city, action) };
+  }
+
+  const plan: RoutePlan = planRoute(city, a.tool, a.from, a.to);
+  const result: ActionResult = buildRoute(city, plan);
+
+  if (!plan.success) {
+    return { action: action, result: result };
+  }
+
+  return {
+    action: action,
+    result: result,
+    tiles: plan.tiles.map((tile: RouteTile): [number, number] =>
+      [tile.x, tile.y]),
+  };
+}
+
+// Raw values, so the log keeps the flags too, for example the power bit
 function readTiles(map: MapLike): number[] {
   const tiles: number[] = [];
 
   for (let y: number = 0; y < map.height; y++) {
     for (let x: number = 0; x < map.width; x++) {
-      tiles.push(map.getTileValue(x, y));
+      tiles.push(map.getTile(x, y).getRawValue());
     }
   }
 
@@ -208,10 +236,7 @@ async function runGame(agent: Agent,
     const actions: unknown[] = Array.isArray(chosen) ? chosen : [];
     const applied: AppliedAction[] = actions
       .slice(0, settings.maxActionsPerTurn)
-      .map((action: unknown): AppliedAction => ({
-        action: action,
-        result: applyAction(city, action),
-      }));
+      .map((action: unknown): AppliedAction => playAction(city, action));
     const windowsBefore: number = getBudgetLog(city).length;
 
     stepMonths(city, settings.monthsPerTurn);

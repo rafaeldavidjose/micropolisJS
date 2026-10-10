@@ -271,9 +271,11 @@ interface GameOptions {
   recordMap: boolean;
 }
 
+// tiles is set for a route that had a plan, as [x, y] along the route
 interface AppliedAction {
   action: unknown;
   result: ActionResult;
+  tiles?: [number, number][];
 }
 
 /* One turn of a run. The state and the map changes are from the start of
@@ -290,6 +292,7 @@ interface TurnLog {
   agent: Record<string, unknown> | null;
 }
 
+// Map tiles are raw values, with the flag bits of src/tileFlags.ts
 interface RunLog {
   version: number;
   options: GameOptions;
