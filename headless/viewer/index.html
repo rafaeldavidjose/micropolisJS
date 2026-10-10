@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Replay viewer</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <strong>Replay viewer</strong>
+    <span id="settings" class="settings">No log loaded</span>
+    <button id="open" type="button">Open log</button>
+    <input id="file" type="file" accept=".json,application/json" hidden>
+  </header>
+
+  <main>
+    <section class="panel" id="actions-panel">
+      <h2 id="turn-title">Actions</h2>
+      <ol id="actions" class="actions"></ol>
+      <p id="actions-note" class="note"></p>
+    </section>
+
+    <section id="map-area">
+      <canvas id="map"></canvas>
+      <div id="hover" class="hover" hidden></div>
+      <div id="message" class="message">
+        Drop a run log here, or use Open log.
+      </div>
+      <p class="sprites-note">
+        Sprites (tornadoes, monsters, planes, helicopters, ships and trains)
+        are not in the log, so they are not shown.
+      </p>
+    </section>
+
+    <section class="panel" id="state-panel">
+      <h2 id="date">State</h2>
+      <dl id="state" class="state"></dl>
+      <h3>Demand</h3>
+      <div id="rci" class="bars"></div>
+      <h3>Problems</h3>
+      <div id="problems" class="bars"></div>
+      <h3 id="population-title">Population</h3>
+      <canvas id="population-chart" class="chart"></canvas>
+      <h3 id="funds-title">Funds</h3>
+      <canvas id="funds-chart" class="chart"></canvas>
+      <div id="windows"></div>
+      <h3>Agent report</h3>
+      <pre id="report" class="report"></pre>
+    </section>
+  </main>
+
+  <footer>
+    <button id="first" type="button" title="First turn (Home)">|&lt;</button>
+    <button id="back" type="button" title="One turn back (Left)">&lt;</button>
+    <button id="play" type="button" title="Play or pause (Space)">Play</button>
+    <button id="forward" type="button" title="One turn forward (Right)">&gt;</button>
+    <button id="last" type="button" title="End of the game (End)">&gt;|</button>
+    <input id="slider" type="range" min="0" max="0" value="0" step="1"
+           aria-label="Turn">
+    <span id="position" class="position">Turn 0</span>
+    <label>Speed
+      <select id="speed">
+        <option value="0.5">0.5 turns/s</option>
+        <option value="1">1 turn/s</option>
+        <option value="2">2 turns/s</option>
+        <option value="4" selected>4 turns/s</option>
+        <option value="8">8 turns/s</option>
+        <option value="16">16 turns/s</option>
+      </select>
+    </label>
+    <label><input id="after" type="checkbox"> Map after the turn</label>
+    <label><input id="power" type="checkbox" checked> Unpowered zones</label>
+    <button id="fit" type="button" title="Fit the map">Fit</button>
+  </footer>
+
+  <script type="module" src="viewer.js"></script>
+</body>
+</html>
