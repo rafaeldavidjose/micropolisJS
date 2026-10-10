@@ -8,6 +8,7 @@ import type {
   CensusLike,
   MapLike,
   SimulationLike,
+  ToolLike,
   ToolMap,
   ValvesLike,
 } from './types.ts';
@@ -17,6 +18,10 @@ interface EnginePrivates {
   _census: CensusLike;
   _valves: ValvesLike;
   _constructSimData(): unknown;
+}
+
+interface ToolPrivates {
+  _applicationCost: number;
 }
 
 const toolsByCity: WeakMap<SimulationLike, ToolMap> = new WeakMap();
@@ -35,6 +40,11 @@ function getCensus(city: SimulationLike): CensusLike {
 
 function getValves(city: SimulationLike): ValvesLike {
   return privates(city)._valves;
+}
+
+// What a tool has charged so far for changes it has not applied yet
+function getPendingCost(tool: ToolLike): number {
+  return (tool as unknown as ToolPrivates)._applicationCost;
 }
 
 // One step for every sprite, with the same data the browser passes
@@ -60,4 +70,11 @@ function getTools(city: SimulationLike): ToolMap {
   return tools;
 }
 
-export { getMap, getCensus, getValves, getTools, moveSprites };
+export {
+  getMap,
+  getCensus,
+  getValves,
+  getPendingCost,
+  getTools,
+  moveSprites,
+};

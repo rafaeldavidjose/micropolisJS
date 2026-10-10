@@ -47,9 +47,18 @@ interface DisasterManagerLike {
   disastersEnabled: boolean;
 }
 
+// The raw value holds the tile number and its flags together
+interface TileLike {
+  getValue(): number;
+  getRawValue(): number;
+  isBulldozable(): boolean;
+  isConductive(): boolean;
+}
+
 interface MapLike {
   width: number;
   height: number;
+  getTile(x: number, y: number): TileLike;
   getTileValue(x: number, y: number): number;
 }
 
@@ -116,13 +125,41 @@ type ActionFailure =
   | 'insufficient-funds'
   | 'occupied'
   | 'blocked'
-  | 'nothing-to-bulldoze';
+  | 'nothing-to-bulldoze'
+  | 'no-route'
+  | 'stale-plan';
 
 // The cost is what was really spent, so it is 0 when the action fails
 interface ActionResult {
   success: boolean;
   cost: number;
   reason: ActionFailure | null;
+}
+
+interface Position {
+  x: number;
+  y: number;
+}
+
+// 'existing' already has the same kind and costs nothing
+type RouteTileKind = 'new' | 'bridge' | 'existing';
+
+interface RouteTile {
+  x: number;
+  y: number;
+  cost: number;
+  kind: RouteTileKind;
+}
+
+/* A planned route with the engine's cost. The fingerprint holds the tiles
+ * the result depends on, as they were when the plan was made. */
+interface RoutePlan {
+  success: boolean;
+  cost: number;
+  reason: ActionFailure | null;
+  tool: string;
+  tiles: RouteTile[];
+  fingerprint: number[];
 }
 
 // Whole numbers from 0 to 100, like the sliders in the budget window
@@ -189,9 +226,14 @@ export type {
   CityState,
   CreateCityOptions,
   MapLike,
+  Position,
+  RoutePlan,
+  RouteTile,
+  RouteTileKind,
   SaveData,
   SimulationLike,
   SpriteLike,
+  TileLike,
   ToolLike,
   ToolMap,
   ValvesLike,
