@@ -17,6 +17,7 @@
     "test:watch": "jest --watch",
     "test:headless": "tsx --test headless/test/*.ts",
     "bench:headless": "tsx headless/bench.ts",
+    "play:headless": "tsx headless/play.ts",
     "lint": "tslint src/*.ts test/*.ts",
     "dev": "webpack serve --mode development",
     "production": "webpack serve --mode production"
