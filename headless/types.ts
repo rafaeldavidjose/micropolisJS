@@ -53,6 +53,7 @@ interface TileLike {
   getRawValue(): number;
   isBulldozable(): boolean;
   isConductive(): boolean;
+  isZone(): boolean;
 }
 
 interface MapLike {
@@ -85,6 +86,8 @@ interface CityDate {
 interface ToolLike {
   result: number | null;
   size?: number;
+  toolCost: number;
+  bulldozerCost: number;
   TOOLRESULT_OK: number;
   TOOLRESULT_FAILED: number;
   TOOLRESULT_NO_MONEY: number;
