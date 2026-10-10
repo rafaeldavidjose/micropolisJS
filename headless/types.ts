@@ -130,7 +130,8 @@ type ActionFailure =
   | 'blocked'
   | 'nothing-to-bulldoze'
   | 'no-route'
-  | 'stale-plan';
+  | 'stale-plan'
+  | 'unknown-action';
 
 // The cost is what was really spent, so it is 0 when the action fails
 interface ActionResult {
@@ -186,6 +187,123 @@ interface BudgetWindowRecord {
   autoBudgetWasOn: boolean;
 }
 
+/* Actions as plain data, so an agent can write them as JSON. A route is
+ * planned again when it is applied, so earlier actions of the same turn
+ * count. */
+interface BuildAction {
+  type: 'build';
+  tool: string;
+  x: number;
+  y: number;
+}
+
+interface RouteAction {
+  type: 'route';
+  tool: string;
+  from: Position;
+  to: Position;
+}
+
+interface BulldozeAction {
+  type: 'bulldoze';
+  x: number;
+  y: number;
+}
+
+interface TaxAction {
+  type: 'setTaxRate';
+  rate: number;
+}
+
+interface BudgetAction {
+  type: 'setBudgetPercentages';
+  road: number;
+  fire: number;
+  police: number;
+}
+
+interface AutoBudgetAction {
+  type: 'setAutoBudget';
+  enabled: boolean;
+}
+
+type GameAction =
+  | BuildAction
+  | RouteAction
+  | BulldozeAction
+  | TaxAction
+  | BudgetAction
+  | AutoBudgetAction;
+
+interface MapView {
+  width: number;
+  height: number;
+  getTileValue(x: number, y: number): number;
+}
+
+/* What an agent sees at the start of a turn. Quotes and plans are made
+ * against the city as it is then, before any of the agent's actions. */
+interface CityView {
+  turn: number;
+  maxActions: number;
+  state: CityState;
+  map: MapView;
+  budgetLog: BudgetWindowRecord[];
+  quote(action: GameAction): ActionResult;
+  planRoute(tool: string, from: Position, to: Position): RoutePlan;
+}
+
+// decide may return a promise, so an agent can wait for a language model
+interface Agent {
+  name: string;
+  decide(view: CityView): GameAction[] | Promise<GameAction[]>;
+  settings?(): Record<string, unknown>;
+  report?(): Record<string, unknown>;
+}
+
+interface GameOptions {
+  seed: number;
+  level: number;
+  disasters: boolean;
+  turns: number;
+  monthsPerTurn: number;
+  maxActionsPerTurn: number;
+  recordMap: boolean;
+}
+
+interface AppliedAction {
+  action: unknown;
+  result: ActionResult;
+}
+
+/* One turn of a run. The state and the map changes are from the start of
+ * the turn, when the agent decided. The budget windows were answered while
+ * the city was stepped after the actions. */
+interface TurnLog {
+  turn: number;
+  date: CityDate;
+  state: CityState;
+  mapChanges: [number, number][];
+  actions: AppliedAction[];
+  dropped: number;
+  budgetWindows: BudgetWindowRecord[];
+  agent: Record<string, unknown> | null;
+}
+
+interface RunLog {
+  version: number;
+  options: GameOptions;
+  agent: { name: string; settings: Record<string, unknown> | null };
+  map: { width: number; height: number; tiles: number[] } | null;
+  turns: TurnLog[];
+  final: {
+    date: CityDate;
+    state: CityState;
+    mapChanges: [number, number][];
+    hash: string;
+  };
+}
+
 interface CreateCityOptions {
   seed: number;
   level: number;
@@ -221,23 +339,31 @@ interface CityState {
 export type {
   ActionFailure,
   ActionResult,
+  Agent,
+  AppliedAction,
   BudgetLike,
   BudgetPercentages,
   BudgetWindowRecord,
   CensusLike,
   CityDate,
   CityState,
+  CityView,
   CreateCityOptions,
+  GameAction,
+  GameOptions,
   MapLike,
+  MapView,
   Position,
   RoutePlan,
   RouteTile,
   RouteTileKind,
+  RunLog,
   SaveData,
   SimulationLike,
   SpriteLike,
   TileLike,
   ToolLike,
   ToolMap,
+  TurnLog,
   ValvesLike,
 };
