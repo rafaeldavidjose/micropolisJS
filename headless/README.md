@@ -5,7 +5,9 @@ can create a city from a seed, a difficulty level and a disasters option,
 advance it a number of months as fast as the CPU allows, and read back a
 summary of its state. The same seed always gives the same result. A small
 set of actions lets a program build, bulldoze and set the taxes and the
-budget, the same things a player does in the browser.
+budget, the same things a player does in the browser. Roads, rails and
+power lines can also be planned as routes between two tiles and built
+once the price is known.
 
 The fork is based on graememcc/micropolisJS at commit `f13a162` (13 July
 2025). The engine changes this needed are listed in `CHANGES.md`. The
@@ -23,7 +25,7 @@ Run `npm install` once. It installs `tsx`, which runs the TypeScript files
 directly.
 
 ```sh
-npm run test:headless   # determinism, action, budget and sprite tests (node:test)
+npm run test:headless   # determinism, action, budget, sprite and route tests (node:test)
 npm run bench:headless  # times 20 in-game years
 ```
 
@@ -33,7 +35,8 @@ The tests use `node:test` because the project's Jest setup only covers
 ## API
 
 Creating, stepping, reading, saving and loading a city is in `runner.ts`.
-The actions are in `actions.ts` and the budget log in `budget.ts`.
+The actions are in `actions.ts`, the routes in `routes.ts` and the budget
+log in `budget.ts`.
 
 ```ts
 import { createCity, stepMonths, getState, saveCity, loadCity, Simulation }
@@ -143,6 +146,80 @@ as long as the same actions happen at the same points of the run.
 
 The engine tools only print a warning when the position is off the map,
 so `actions.ts` checks the position itself before it calls them.
+
+## Routes
+
+```ts
+import { planRoute, buildRoute } from './routes.ts';
+
+const plan = planRoute(city, 'road', { x: 58, y: 47 }, { x: 64, y: 47 });
+// plan.cost is 72, plan.tiles starts with
+// { x: 58, y: 47, cost: 11, kind: 'new' }, { x: 59, y: 47, cost: 11, kind: 'new' }
+const result = buildRoute(city, plan);
+// { success: true, cost: 72, reason: null }
+```
+
+(The numbers are for a new city with seed 12345 on hard.)
+
+`planRoute(city, tool, from, to)` finds the cheapest route for a `road`,
+`rail` or `wire` between two tiles, both included. It changes nothing in
+the city. The agent decides which places to connect and whether to build.
+A route can end on empty land.
+
+Every tile in `plan.tiles` has its cost and a kind. `new` is a tile the
+tool lays, `bridge` is a new tile over water, and `existing` already has
+a road, rail or power line. Existing tiles cost nothing and are left as
+they are. `plan.cost` is the sum.
+
+The prices come from `layRoad`, `layRail` and `layWire` in
+`src/roadTool.js`, `src/railTool.js` and `src/wireTool.js`. A tile costs
+$10 for road, $20 for rail and $5 for wire, plus $1 where the tool first
+clears a tree, rubble or a shore tile. A bridge costs $50, $100 or $25.
+
+A tool can cross a straight line of another kind for the normal price. A
+road crosses a straight power line or rail, a rail crosses a straight
+road or power line, and a wire crosses a straight road or rail. The
+engine always lays the crossing piece at a right angle to the line it
+crosses. Traffic and power go through it in all four directions
+(`TileUtils.isDriveable` and the power scan), so a route may pass it
+either way. Curves, T pieces and intersections of another kind cannot be
+crossed. Neither can zones, buildings, fire, flood or radioactive tiles.
+
+A bridge needs a piece next to it that the tool accepts. The engine looks
+east, west, south and north in that order, and the first match decides
+which way the bridge runs. A route therefore crosses water in a straight
+line, cannot turn on water, and can only start on water next to a
+matching piece. The sides are not all the same: a road bridge accepts a
+horizontal road and power crossing to its east but not to its west. The
+original Micropolis has the same rule (`_LayRoad` in `w_con.c`).
+
+The search is Dijkstra on the tile grid, 4-connected. Ties go to the
+shorter route, then to the first one found, with the neighbours in a
+fixed order, so the same city and endpoints always give the same route.
+Existing pieces cost nothing, so a route may follow an existing road if
+that is cheaper.
+
+The search knows the rules above, but the cost of a plan comes from the
+engine. The tools collect their changes in a buffer and only write them to
+the map and take the money in `modifyIfEnoughFunding`. `planRoute` lays
+the route into that buffer and clears it again. When the search decides a
+bridge it only knows the previous route tile. If an earlier route tile
+next to the water turns the bridge the other way, the engine refuses the
+next tile. `planRoute` then bans that step and searches again.
+
+`buildRoute(city, plan)` lays the same tiles with the same tool as one
+change and pays for it. It builds everything or nothing. The plan keeps
+the tiles it depends on: the route tiles, and for a bridge also its four
+neighbours. Road tiles are compared without their traffic. If any of them
+changed, or the engine now asks a different price, `buildRoute` refuses
+the plan as `stale-plan`. The planned cost is exactly what it takes from
+the funds.
+
+`planRoute` fails with `unknown-tool` for any other tool,
+`invalid-position` for an endpoint off the map, `blocked` when the tool
+can never use one of the endpoints, and `no-route` when no route exists.
+`buildRoute` fails with `insufficient-funds`, `stale-plan`, or the reason
+of a failed plan. A failed `buildRoute` changes nothing.
 
 ## Budget window
 
