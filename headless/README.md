@@ -25,9 +25,17 @@ Run `npm install` once. It installs `tsx`, which runs the TypeScript files
 directly.
 
 ```sh
-npm run test:headless   # determinism, action, budget, sprite and route tests (node:test)
+npm run test:headless   # all headless tests (node:test)
 npm run bench:headless  # times 20 in-game years
+npm run play:headless -- --agent random --seed 3 --level hard --disasters on --out run.json
 ```
+
+`play:headless` plays one game and writes its run log. The options are
+`--agent` (`random` or `passive`), `--seed` for the city, `--agent-seed`
+(the city seed if left out), `--level` (`easy`, `medium` or `hard`),
+`--disasters` (`on` or `off`), `--turns`, `--months` for the months per
+turn, `--max-actions` and `--out`. Left out, they take the defaults of
+`runGame`. It prints the final population and funds when it is done.
 
 The tests use `node:test` because the project's Jest setup only covers
 `src/` and `test/`. `npm test` still runs the engine's own Jest tests.
@@ -36,7 +44,8 @@ The tests use `node:test` because the project's Jest setup only covers
 
 Creating, stepping, reading, saving and loading a city is in `runner.ts`.
 The actions are in `actions.ts`, the routes in `routes.ts` and the budget
-log in `budget.ts`.
+log in `budget.ts`. The game loop is in `game.ts` and the agents are in
+`agents/`.
 
 ```ts
 import { createCity, stepMonths, getState, saveCity, loadCity, Simulation }
@@ -147,6 +156,33 @@ as long as the same actions happen at the same points of the run.
 The engine tools only print a warning when the position is off the map,
 so `actions.ts` checks the position itself before it calls them.
 
+## Quotes
+
+```ts
+import { quoteBuild, quoteBulldoze } from './actions.ts';
+
+quoteBuild(city, 'residential', 58, 47);
+// { success: true, cost: 100, reason: null }, and the city is unchanged
+```
+
+Every action has a quote that says what it would do and cost, without
+changing the city: `quoteBuild`, `quoteBulldoze`, `quoteSetTaxRate`,
+`quoteSetBudgetPercentages` and `quoteSetAutoBudget`. A quote has the
+same shape and the same failure reasons as the action. When only the
+money is missing, the quote gives `insufficient-funds` with the price, so
+the agent knows how much it needs. For any other failure the cost is 0.
+Routes have `planRoute` instead, see "Routes".
+
+`quoteBuild` and `quoteBulldoze` work like `planRoute`. They let the
+engine's tool prepare the change in its buffer, read the cost and the
+result, and clear the buffer. Two tools draw from the shared random
+generator in `doTool`, so they are priced from their rules. The park tool
+picks the kind of park at random. It only works on bare land and always
+costs $10. The bulldozer picks the rubble at random when it clears a zone
+or a big building, and it always charges $1 there. Elsewhere the bulldozer
+draws nothing and goes through its buffer like the other tools. Quoting
+never draws from the generator, so it cannot change a run.
+
 ## Routes
 
 ```ts
@@ -220,6 +256,100 @@ the funds.
 can never use one of the endpoints, and `no-route` when no route exists.
 `buildRoute` fails with `insufficient-funds`, `stale-plan`, or the reason
 of a failed plan. A failed `buildRoute` changes nothing.
+
+## Agents and the game loop
+
+```ts
+import { runGame, writeRunLog } from './game.ts';
+import { passiveAgent } from './agents/passive.ts';
+
+const log = await runGame(passiveAgent, { seed: 1, turns: 8 });
+writeRunLog('run.json', log);
+```
+
+An agent has a name and a `decide(view)` method. Once per turn it gets a
+view of the city and returns a list of actions. An empty list means do
+nothing. `decide` may return a promise, so an agent can wait for a
+language model. Optional `settings()` and `report()` methods add the
+agent's settings to the log, and something of its own to every turn.
+
+The view has `turn`, `maxActions`, `state` (from `getState`), `map` with
+`width`, `height` and `getTileValue(x, y)`, the budget log so far,
+`quote(action)` and `planRoute(tool, from, to)`. Quotes and plans are
+made against the city at the start of the turn, before any of the
+agent's own actions.
+
+Actions are plain data, so an agent can write them as JSON:
+
+```ts
+{ type: 'build', tool: 'residential', x: 58, y: 47 }
+{ type: 'route', tool: 'road', from: { x: 55, y: 49 }, to: { x: 62, y: 49 } }
+{ type: 'bulldoze', x: 58, y: 47 }
+{ type: 'setTaxRate', rate: 9 }
+{ type: 'setBudgetPercentages', road: 100, fire: 80, police: 60 }
+{ type: 'setAutoBudget', enabled: false }
+```
+
+The build tools are the ones in `BUILD_TOOLS`, so a single road, rail or
+wire tile can also be built. A route is planned again when it is applied,
+so earlier actions of the same turn count. Anything else fails with
+`unknown-action`, and fields of the wrong type fail in the action itself.
+
+`runGame(agent, options)` creates the city from `seed`, `level` and
+`disasters`. Each turn it asks the agent, applies the actions in order,
+and steps the city `monthsPerTurn` months. Actions past
+`maxActionsPerTurn` are dropped and counted. The defaults are provisional
+until the experiment is designed:
+
+- `level`: easy, and `disasters`: off, as a new game in the browser
+- `turns`: 80 and `monthsPerTurn`: 3, so 20 years
+- `maxActionsPerTurn`: 5
+
+The run log has the options, the agent's name and settings, the map at
+the start, one entry per turn and the final state with the city hash.
+Each turn has the date and the state the agent saw, the map changes since
+the turn before, the actions with their results, the number of dropped
+actions, the budget windows answered while the city ran, and the agent's
+report. The map is stored as tile values, row by row, and every turn as
+a list of `[index, value]` changes, so a replay can rebuild the map of
+any turn. A 20 year log is about 60 kB for the passive agent and 90 to
+100 kB for the random agent. `recordMap: false` leaves the map out.
+
+`agents/passive.ts` has the passive agent, which does nothing.
+
+## Random agent
+
+```ts
+import { createRandomAgent } from './agents/random.ts';
+
+const log = await runGame(createRandomAgent({ seed: 7 }), { seed: 1 });
+```
+
+Each turn the random agent takes a random number of slots, from 0 to the
+maximum number of actions. For each slot it first picks a category: a
+building or zone (any build tool except road, rail and wire), a route
+(road, rail or wire), bulldozing, the tax rate, the budget percentages,
+auto budget, or nothing. The weights are equal unless `weights` says
+otherwise. Then it draws the parameters, all uniform: a tile anywhere on
+the map, for a route a start tile and an end tile at most
+`maxRouteDistance` apart (Manhattan distance, 20 by default), a tax rate
+from 0 to 20, and percentages from 0 to 100.
+
+It only plays valid actions. It quotes every draw, or plans it for a
+route, and draws again when the quote fails, up to `maxTries` times (20
+by default). It also keeps aside the money its earlier actions of the
+turn will spend. Its report in every turn of the log has the number of
+slots, the slots that picked nothing, the draws, the rejected draws by
+reason, and the slots where it gave up. Actions are quoted against the
+city at the start of the turn, so one can still fail when it is applied
+after another, for example two buildings on the same site.
+
+It has its own random generator in `rng.ts`, seeded with `seed`. It is
+the same mulberry32 as the game's, with its own state, so the agent's
+draws never move the game's sequence. The park tool and the bulldozer
+still draw from the game's generator when one of their actions is
+applied. A run stays reproducible, since the same seeds give the same
+actions at the same points.
 
 ## Budget window
 
