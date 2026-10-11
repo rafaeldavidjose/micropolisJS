@@ -15,7 +15,7 @@ and left as they are.
 
 ### 1. src/boatSprite.js: removed an unused, broken import
 
-Commit `5d11c91`.
+Commit `2de86a3`.
 
 `boatSprite.js` imported `SpriteConstants` from `spriteConstants.ts`, but
 that file has no such export. It only exports single constants like
@@ -26,7 +26,7 @@ changes nothing in the browser build.
 
 ### 2. src/simulation.js: `budget` changed to `this.budget` in the census calls
 
-Commit `642655e`.
+Commit `75c8115`.
 
 ```js
 this._census.take10Census(this.budget);
@@ -52,7 +52,7 @@ implemented (`// TODO Graphs` in `simTick`).
 
 ### 3. src/random.ts: optional seeded generator
 
-Commit `97440e2`.
+Commit `5535b57`.
 
 I added a mulberry32 generator with `Random.setSeed(seed)`,
 `Random.getSeed()` and `Random.clearSeed()`. When a seed is set,
@@ -65,7 +65,7 @@ and those tests still pass.
 
 ### 4. src/simulation.js: added `forceTick()`
 
-Commit `4341a1b`.
+Commit `7c23414`.
 
 `_simFrame` only advances the simulation when enough real time has passed,
 using `new Date()`. For headless runs I need to step without a clock.
@@ -78,7 +78,7 @@ loop are unchanged.
 
 ### 5. tsconfig.json: `include` limited to src/ and test/
 
-Commit `9872afd`.
+Commit `3120301`.
 
 `tsconfig.json` had no `include`, so TypeScript picked up every `.ts` file
 in the project, including `headless/`. `ts-loader` type checks the whole
@@ -91,7 +91,7 @@ the build or Jest.
 
 ### 6. jest.config.js renamed to jest.config.cjs
 
-Commit `96c9d70`.
+Commit `9fa0f34`.
 
 `package.json` sets `"type": "module"`, which upstream added, so Node
 treats every `.js` file as an ES module. `jest.config.js` uses
