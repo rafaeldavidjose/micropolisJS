@@ -67,6 +67,10 @@ interface MapLike {
 interface SpriteLike {
   type: number;
   frame: number;
+  x: number;
+  y: number;
+  xOffset: number;
+  yOffset: number;
   worldX: number;
   worldY: number;
 }
@@ -75,6 +79,7 @@ interface SpriteManagerLike {
   moveObjects(simData: unknown): void;
   makeTornado(): void;
   getSprite(type: number): SpriteLike | null;
+  getSpriteList(): SpriteLike[];
 }
 
 interface CityDate {
@@ -269,6 +274,7 @@ interface GameOptions {
   monthsPerTurn: number;
   maxActionsPerTurn: number;
   recordMap: boolean;
+  recordSprites: boolean;
 }
 
 // tiles is set for a route that had a plan, as [x, y] along the route
@@ -289,8 +295,17 @@ interface TurnLog {
   actions: AppliedAction[];
   dropped: number;
   budgetWindows: BudgetWindowRecord[];
+  sprites: SpriteSample[];
   agent: Record<string, unknown> | null;
 }
+
+/* A sprite as the browser draws it: type, frame, and the top left corner
+ * of its image in map pixels. */
+type SpriteRecord = [number, number, number, number];
+
+/* The sprites after a number of samples into the turn, from 1 to
+ * samplesPerTurn. Only samples with at least one sprite are kept. */
+type SpriteSample = [number, SpriteRecord[]];
 
 // Map tiles are raw values, with the flag bits of src/tileFlags.ts
 interface RunLog {
@@ -298,6 +313,7 @@ interface RunLog {
   options: GameOptions;
   agent: { name: string; settings: Record<string, unknown> | null };
   map: { width: number; height: number; tiles: number[] } | null;
+  spriteSampling: { ticksPerSample: number; samplesPerTurn: number } | null;
   turns: TurnLog[];
   final: {
     date: CityDate;
@@ -364,6 +380,8 @@ export type {
   SaveData,
   SimulationLike,
   SpriteLike,
+  SpriteRecord,
+  SpriteSample,
   TileLike,
   ToolLike,
   ToolMap,

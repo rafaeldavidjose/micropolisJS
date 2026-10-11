@@ -10,6 +10,8 @@ import { getMap } from '../engine.ts';
 import { hashCity } from '../hash.ts';
 import { applyAction, runGame, writeRunLog } from '../game.ts';
 import { passiveAgent } from '../agents/passive.ts';
+import { createDemoAgent } from '../agents/demo.ts';
+import { Random } from '../../src/random.ts';
 import type {
   ActionResult,
   Agent,
@@ -19,6 +21,8 @@ import type {
   MapLike,
   RunLog,
   SimulationLike,
+  SpriteRecord,
+  SpriteSample,
   TurnLog,
 } from '../types.ts';
 
@@ -198,4 +202,34 @@ test('game: the log is written as JSON', async () => {
   writeRunLog(path, log);
 
   assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), log);
+});
+
+/* On hard with disasters on, a monster comes to the demo town on seed 5 in
+ * the second turn. Reading the sprites must not change the run, so the
+ * city, the states and the game's next random number are the same. */
+test('game: recording sprites does not change the run', async () => {
+  const options = {
+    seed: 5, level: Simulation.LEVEL_HARD, disasters: true, turns: 6,
+  };
+  const recorded: RunLog = await runGame(createDemoAgent(), options);
+  const recordedNext: number = Random.getRandom(1000000);
+  const plain: RunLog = await runGame(createDemoAgent(),
+    { ...options, recordSprites: false });
+  const plainNext: number = Random.getRandom(1000000);
+  const types: Set<number> = new Set(recorded.turns.flatMap(
+    (turn: TurnLog): number[] => turn.sprites.flatMap(
+      ([, sprites]: SpriteSample): number[] =>
+        sprites.map((sprite: SpriteRecord): number => sprite[0]))));
+
+  assert.ok(types.has(5));
+  assert.deepEqual(recorded.spriteSampling,
+    { ticksPerSample: 4, samplesPerTurn: 48 });
+  assert.equal(plain.spriteSampling, null);
+  assert.ok(plain.turns.every((turn: TurnLog): boolean =>
+    turn.sprites.length === 0));
+  assert.equal(recorded.final.hash, plain.final.hash);
+  assert.equal(recordedNext, plainNext);
+  assert.deepEqual(
+    recorded.turns.map((turn: TurnLog): unknown => turn.state),
+    plain.turns.map((turn: TurnLog): unknown => turn.state));
 });

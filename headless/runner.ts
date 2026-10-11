@@ -47,7 +47,9 @@ function createCity(options: CreateCityOptions): SimulationLike {
   return city;
 }
 
-function stepMonths(city: SimulationLike, monthCount: number): void {
+// afterTick, if given, runs after every tick and must only read the city
+function stepMonths(city: SimulationLike, monthCount: number,
+    afterTick?: (tick: number) => void): void {
   const tickCount: number = monthCount * TICKS_PER_MONTH;
 
   for (let tick: number = 0; tick < tickCount; tick++) {
@@ -64,6 +66,8 @@ function stepMonths(city: SimulationLike, monthCount: number): void {
     for (let move: number = 0; move < SPRITE_MOVES_PER_TICK; move++) {
       moveSprites(city);
     }
+
+    afterTick?.(tick);
   }
 }
 
@@ -155,4 +159,5 @@ function loadCity(data: SaveData): SimulationLike {
 // Callers pass Simulation.LEVEL_* to createCity
 export { Simulation };
 
-export { createCity, stepMonths, getState, saveCity, loadCity };
+export { TICKS_PER_MONTH, createCity, stepMonths, getState, saveCity,
+  loadCity };

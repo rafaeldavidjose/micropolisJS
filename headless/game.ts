@@ -1,5 +1,11 @@
 import { writeFileSync } from 'node:fs';
-import { createCity, getState, stepMonths, Simulation } from './runner.ts';
+import {
+  TICKS_PER_MONTH,
+  createCity,
+  getState,
+  stepMonths,
+  Simulation,
+} from './runner.ts';
 import {
   build,
   bulldoze,
@@ -32,10 +38,19 @@ import type {
   RouteTile,
   RunLog,
   SimulationLike,
+  SpriteLike,
+  SpriteRecord,
+  SpriteSample,
   TurnLog,
 } from './types.ts';
 
-const LOG_VERSION: number = 2;
+const LOG_VERSION: number = 3;
+
+/* Sprites move 3 times per tick. A tornado moves about 2 pixels a move
+ * and a train 4, so with a sample every time unit (16 ticks) a tornado
+ * would jump 6 tiles between samples and a train 12. Every 4 ticks they
+ * move about 1.5 and 3 tiles. */
+const SPRITE_SAMPLE_TICKS: number = 4;
 
 /* Provisional until the experiment is designed. Level and disasters are
  * what a new game starts with in the browser. 80 turns of 3 months are 20
@@ -47,6 +62,7 @@ const DEFAULT_OPTIONS: Omit<GameOptions, 'seed'> = {
   monthsPerTurn: 3,
   maxActionsPerTurn: 5,
   recordMap: true,
+  recordSprites: true,
 };
 
 function fail(reason: ActionFailure): ActionResult {
@@ -192,6 +208,14 @@ function diffTiles(before: number[], after: number[]): [number, number][] {
   return changes;
 }
 
+// Only reads the sprite list, so it draws no random number
+function readSprites(city: SimulationLike): SpriteRecord[] {
+  return city.spriteManager.getSpriteList()
+    .filter((sprite: SpriteLike): boolean => sprite.frame !== 0)
+    .map((sprite: SpriteLike): SpriteRecord => [sprite.type, sprite.frame,
+      sprite.x + sprite.xOffset, sprite.y + sprite.yOffset]);
+}
+
 function makeView(city: SimulationLike, turn: number,
     maxActions: number): CityView {
   const map: MapLike = getMap(city);
@@ -238,8 +262,19 @@ async function runGame(agent: Agent,
       .slice(0, settings.maxActionsPerTurn)
       .map((action: unknown): AppliedAction => playAction(city, action));
     const windowsBefore: number = getBudgetLog(city).length;
+    const sprites: SpriteSample[] = [];
 
-    stepMonths(city, settings.monthsPerTurn);
+    stepMonths(city, settings.monthsPerTurn, (tick: number): void => {
+      if (!settings.recordSprites || (tick + 1) % SPRITE_SAMPLE_TICKS !== 0) {
+        return;
+      }
+
+      const seen: SpriteRecord[] = readSprites(city);
+
+      if (seen.length > 0) {
+        sprites.push([(tick + 1) / SPRITE_SAMPLE_TICKS, seen]);
+      }
+    });
 
     turns.push({
       turn: turn,
@@ -249,6 +284,7 @@ async function runGame(agent: Agent,
       actions: applied,
       dropped: Math.max(0, actions.length - settings.maxActionsPerTurn),
       budgetWindows: getBudgetLog(city).slice(windowsBefore),
+      sprites: sprites,
       agent: agent.report ? agent.report() : null,
     });
     lastTiles = settings.recordMap ? tiles : lastTiles;
@@ -265,6 +301,11 @@ async function runGame(agent: Agent,
     },
     map: settings.recordMap ?
       { width: map.width, height: map.height, tiles: firstTiles } : null,
+    spriteSampling: settings.recordSprites ? {
+      ticksPerSample: SPRITE_SAMPLE_TICKS,
+      samplesPerTurn: settings.monthsPerTurn * TICKS_PER_MONTH /
+        SPRITE_SAMPLE_TICKS,
+    } : null,
     turns: turns,
     final: {
       date: city.getDate(),
