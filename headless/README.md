@@ -32,14 +32,14 @@ npm run replay -- runs/run.json  # opens the replay viewer on a run log
 ```
 
 `play:headless` plays one game and writes its run log. The options are
-`--agent` (`random`, `passive` or `demo`), `--seed` for the city, `--agent-seed`
-(the city seed if left out), `--level` (`easy`, `medium` or `hard`),
-`--disasters` (`on` or `off`), `--turns`, `--months` for the months per
-turn, `--max-actions` and `--out`. Left out, they take the defaults of
-`runGame`. A bare file name for `--out`, like the default `run.json`,
-goes into `runs/` at the root of the repository, which git ignores. A
-path with a folder is used as it is. It prints the final population and
-funds, and where the log went, when it is done.
+`--agent` (`random`, `greedy`, `passive` or `demo`), `--seed` for the
+city, `--agent-seed` (the city seed if left out), `--level` (`easy`,
+`medium` or `hard`), `--disasters` (`on` or `off`), `--turns`, `--months`
+for the months per turn, `--max-actions` and `--out`. Left out, they take
+the defaults of `runGame`. A bare file name for `--out`, like the default
+`run.json`, goes into `runs/` at the root of the repository, which git
+ignores. A path with a folder is used as it is. It prints the final
+population and funds, and where the log went, when it is done.
 
 The tests use `node:test` because the project's Jest setup only covers
 `src/` and `test/`. `npm test` still runs the engine's own Jest tests.
@@ -278,10 +278,17 @@ language model. Optional `settings()` and `report()` methods add the
 agent's settings to the log, and something of its own to every turn.
 
 The view has `turn`, `maxActions`, `state` (from `getState`), `map` with
-`width`, `height` and `getTileValue(x, y)`, the budget log so far,
-`quote(action)` and `planRoute(tool, from, to)`. Quotes and plans are
-made against the city at the start of the turn, before any of the
+`width`, `height` and `getTileValue(x, y)`, `zones`, the budget log so
+far, `quote(action)` and `planRoute(tool, from, to)`. Quotes and plans
+are made against the city at the start of the turn, before any of the
 agent's own actions.
+
+`getTileValue` gives the tile number without the flag bits, so the map
+alone does not say which zones have power. A player sees it in the
+browser, where a lightning bolt blinks on the centre of every zone or
+building without power. `zones` gives every agent the same: a list of
+zone and building centres as `{ x, y, tile, powered }`, read from the
+zone and power flags of the centre tile.
 
 Actions are plain data, so an agent can write them as JSON:
 
@@ -393,6 +400,66 @@ draws never move the game's sequence. The park tool and the bulldozer
 still draw from the game's generator when one of their actions is
 applied. A run stays reproducible, since the same seeds give the same
 actions at the same points.
+
+## Greedy agent
+
+```ts
+import { createGreedyAgent } from './agents/greedy.ts';
+
+const log = await runGame(createGreedyAgent(), { seed: 1 });
+```
+
+The greedy agent follows the most immediate signal, demand. Each turn,
+up to the action limit and while the money lasts, it plays the first of
+these rules that fits, then checks them again:
+
+1. With no power plant, it builds a coal plant on the free site closest
+   to the centre of the map.
+2. When a zone has no power and the power network does not reach it, it
+   lays a power line to the one closest to the city centre.
+3. Otherwise it builds the zone type with the highest positive demand on
+   the free site next to a road closest to the city centre. With no such
+   site, it extends a road.
+4. When zones the network reaches still have no power, the plants cannot
+   feed them all, and it builds another coal plant next to the network.
+
+It ignores crime, fire, pollution, taxes and the budget, and never
+changes the tax rate or the budget settings. It quotes every action and
+only plays the ones the turn can still pay for. When the money is short
+it waits for the next turn. It draws no random numbers.
+
+The city centre is the mean of the zone and building centres in `zones`,
+or the centre of the map before there are any. Distances are straight
+lines. Ties go to the tile higher up the map, then to the one further
+left, and directions are tried in the order east, south, west, north. A
+free site is one whose quote succeeds. The agent only quotes sites made
+of free land and plain power lines, which the tools clear, since a
+building passes power on like a line.
+
+The network is every tile power can reach from a plant through tiles
+that conduct: power lines, the road and rail crossings that carry them,
+and zones and buildings. That is the path of the power scan, without
+its limit on how many tiles a plant feeds. Rule 2 runs the line from the
+point of the network closest to the zone, which is one of its power
+lines or free land next to it, to the tile next to the zone closest to
+that point. Rule 4 is what is left for zones the network does reach.
+
+A new road starts on the road tile closest to the city centre that has
+free land next to it, or on the free tile closest to the centre while
+there is no road, which happens once in a turn. It ends 6 tiles away in
+the first direction where the next tile is free and the end is free
+land, room for two zones along each side. `planRoute` finds the way
+there. Buildings and power line ends stay off the tile straight past the
+end of each road, so the roads can grow.
+
+Like any agent it only gives the two ends of a route, and the route
+comes from `planRoute`. The view does not change during a turn, so the
+agent keeps the money and the tiles its earlier actions of the turn
+take, and the zones it has already wired. Its report in each turn of the
+log lists the rules it used and whether it waited for money.
+
+On maps where water and its own power lines close in the first streets,
+like seed 3 (islands) and seed 10, it can stop early with money left.
 
 ## Demo agent
 

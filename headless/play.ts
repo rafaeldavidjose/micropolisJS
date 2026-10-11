@@ -11,6 +11,7 @@ import { DEFAULT_OPTIONS, allBudgetWindows, runGame, writeRunLog }
   from './game.ts';
 import { Simulation } from './runner.ts';
 import { createDemoAgent } from './agents/demo.ts';
+import { createGreedyAgent } from './agents/greedy.ts';
 import { passiveAgent } from './agents/passive.ts';
 import { createRandomAgent } from './agents/random.ts';
 import type { Agent, RunLog, TurnLog } from './types.ts';
@@ -65,7 +66,12 @@ function makeAgent(name: string, seed: number): Agent {
     return createDemoAgent();
   }
 
-  throw new Error('Unknown agent ' + name + ', use random, passive or demo');
+  if (name === 'greedy') {
+    return createGreedyAgent();
+  }
+
+  throw new Error('Unknown agent ' + name +
+    ', use random, greedy, passive or demo');
 }
 
 if (!(values.level as string in LEVELS)) {

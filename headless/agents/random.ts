@@ -1,20 +1,8 @@
-import {
-  CHURCH7LAST,
-  FOUNTAIN,
-  HBRDG0,
-  HBRDG3,
-  INDBASE2,
-  LIGHTNINGBOLT,
-  RESBASE,
-  TINYEXP,
-  TINYEXPLAST,
-  VBRDG0,
-  VBRDG3,
-} from '../../src/tileValues.ts';
 import { BUILD_TOOLS } from '../actions.ts';
 import { ROUTE_TOOLS, hasPiece } from '../routes.ts';
 import { makeRng } from '../rng.ts';
 import type { Rng } from '../rng.ts';
+import { isBuilding } from './tiles.ts';
 import type {
   ActionResult,
   Agent,
@@ -85,18 +73,6 @@ function pickWeighted(rng: Rng, weights: Record<Category, number>): Category {
 
 function randomTile(rng: Rng, view: CityView): Position {
   return { x: rng.int(view.map.width), y: rng.int(view.map.height) };
-}
-
-/* A tile of a zone or building. Zones and buildings run from RESBASE to
- * the last church, with a park fountain, the draw bridges, the lightning
- * bolt and the explosions in between. */
-function isBuilding(value: number): boolean {
-  return value >= RESBASE && value <= CHURCH7LAST &&
-    value !== LIGHTNINGBOLT &&
-    !(value >= HBRDG0 && value <= HBRDG3) &&
-    !(value >= FOUNTAIN && value < INDBASE2) &&
-    !(value >= TINYEXP && value <= TINYEXPLAST) &&
-    !(value >= VBRDG0 && value <= VBRDG3);
 }
 
 function touchesBuilding(map: MapView, x: number, y: number): boolean {
