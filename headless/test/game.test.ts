@@ -12,6 +12,7 @@ import { applyAction, runGame, writeRunLog } from '../game.ts';
 import { passiveAgent } from '../agents/passive.ts';
 import { createDemoAgent } from '../agents/demo.ts';
 import { Random } from '../../src/random.ts';
+import { FREEZ, POWERPLANT } from '../../src/tileValues.ts';
 import type {
   ActionResult,
   Agent,
@@ -24,6 +25,7 @@ import type {
   SpriteRecord,
   SpriteSample,
   TurnLog,
+  ZoneView,
 } from '../types.ts';
 
 const SEED: number = 20260926;
@@ -232,4 +234,31 @@ test('game: recording sprites does not change the run', async () => {
   assert.deepEqual(
     recorded.turns.map((turn: TurnLog): unknown => turn.state),
     plain.turns.map((turn: TurnLog): unknown => turn.state));
+});
+
+/* A residential zone with no plant has no power. In the demo town, once
+ * its coal plant runs, the plant and the zones next to it have power. */
+test('game: the view lists every zone with its power', async () => {
+  const seen: ZoneView[][] = [];
+  const watched = (inner: Agent): Agent => ({
+    name: inner.name,
+    decide: (view: CityView): GameAction[] | Promise<GameAction[]> => {
+      seen.push(view.zones);
+      return inner.decide(view);
+    },
+  });
+
+  await runGame(watched(scriptedAgent([FIRST_TURN[0]])),
+    { seed: SEED, turns: 2 });
+
+  assert.deepEqual(seen, [[],
+    [{ x: 58, y: 47, tile: FREEZ, powered: false }]]);
+
+  seen.length = 0;
+  await runGame(watched(createDemoAgent()), { seed: SEED, turns: 8 });
+  const last: ZoneView[] = seen[seen.length - 1];
+
+  assert.ok(last.some((zone: ZoneView): boolean =>
+    zone.tile === POWERPLANT && zone.powered));
+  assert.ok(last.filter((zone: ZoneView): boolean => zone.powered).length > 5);
 });

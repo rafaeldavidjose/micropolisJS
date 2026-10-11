@@ -41,7 +41,9 @@ import type {
   SpriteLike,
   SpriteRecord,
   SpriteSample,
+  TileLike,
   TurnLog,
+  ZoneView,
 } from './types.ts';
 
 const LOG_VERSION: number = 3;
@@ -208,6 +210,27 @@ function diffTiles(before: number[], after: number[]): [number, number][] {
   return changes;
 }
 
+function readZones(map: MapLike): ZoneView[] {
+  const zones: ZoneView[] = [];
+
+  for (let y: number = 0; y < map.height; y++) {
+    for (let x: number = 0; x < map.width; x++) {
+      const tile: TileLike = map.getTile(x, y);
+
+      if (tile.isZone()) {
+        zones.push({
+          x: x,
+          y: y,
+          tile: tile.getValue(),
+          powered: tile.isPowered(),
+        });
+      }
+    }
+  }
+
+  return zones;
+}
+
 // Only reads the sprite list, so it draws no random number
 function readSprites(city: SimulationLike): SpriteRecord[] {
   return city.spriteManager.getSpriteList()
@@ -230,6 +253,7 @@ function makeView(city: SimulationLike, turn: number,
     maxActions: maxActions,
     state: getState(city),
     map: mapView,
+    zones: readZones(map),
     budgetLog: getBudgetLog(city),
     quote: (action: GameAction): ActionResult => quoteAction(city, action),
     planRoute: (tool: string, from: Position, to: Position): RoutePlan =>

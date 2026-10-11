@@ -53,6 +53,7 @@ interface TileLike {
   getRawValue(): number;
   isBulldozable(): boolean;
   isConductive(): boolean;
+  isPowered(): boolean;
   isZone(): boolean;
 }
 
@@ -248,11 +249,21 @@ interface MapView {
 
 /* What an agent sees at the start of a turn. Quotes and plans are made
  * against the city as it is then, before any of the agent's actions. */
+/* A zone or building by its centre tile, with the power a player sees:
+ * the browser blinks a lightning bolt on the centre of one without power. */
+interface ZoneView {
+  x: number;
+  y: number;
+  tile: number;
+  powered: boolean;
+}
+
 interface CityView {
   turn: number;
   maxActions: number;
   state: CityState;
   map: MapView;
+  zones: ZoneView[];
   budgetLog: BudgetWindowRecord[];
   quote(action: GameAction): ActionResult;
   planRoute(tool: string, from: Position, to: Position): RoutePlan;
@@ -387,4 +398,5 @@ export type {
   ToolMap,
   TurnLog,
   ValvesLike,
+  ZoneView,
 };
