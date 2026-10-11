@@ -27,15 +27,47 @@ const PROBLEMS = [
   ['unemployment', 'Unemployment'],
   ['fire', 'Fire'],
 ];
-const COLORS = { ok: '#3fd46b', fail: '#ff5a5f', pick: '#ffd23f' };
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 8;
-const CHART_PAD = 4;
+const ZOOM_STEP = 1.5;
+
+/* The tracks under the slider use the same x axis: they start and end at
+ * the centre of the thumb, which is --thumb wide in style.css. */
+const THUMB = 14;
+const TRACK_PAD = THUMB / 2;
+const LANES = {
+  actions: { top: 0, height: 28 },
+  population: { top: 32, height: 34 },
+  funds: { top: 70, height: 34 },
+};
+const AXIS_TOP = 106;
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('map');
 const ctx = canvas.getContext('2d');
 const slider = $('slider');
+const tracks = $('tracks');
+const workspace = $('workspace');
+const narrow = window.matchMedia('(max-width: 1199px)');
+const coarse = window.matchMedia('(pointer: coarse)');
+
+const styles = getComputedStyle(document.documentElement);
+const token = (name) => styles.getPropertyValue(name).trim();
+const COLORS = {
+  ok: token('--ok'),
+  fail: token('--fail'),
+  pick: token('--pick'),
+  fg: token('--fg'),
+  muted: token('--fg-muted'),
+  bg: token('--bg'),
+  lane: token('--surface'),
+  bar: token('--track-bar'),
+  window: token('--window'),
+  population: token('--population'),
+  funds: token('--funds'),
+};
+const FONT_UI = token('--font-ui');
+const FONT_MONO = token('--font-mono');
 
 const sheet = new Image();
 const sheetLoaded = new Promise((resolve, reject) => {
@@ -53,7 +85,11 @@ let position = 0;
 let selected = -1;
 let hover = null;
 let drag = null;
+let scrubbing = false;
+let trackHover = null;
 let timer = null;
+let showAfter = false;
+let markPower = true;
 
 function element(tag, text, className) {
   const node = document.createElement(tag);
@@ -64,6 +100,19 @@ function element(tag, text, className) {
   }
 
   return node;
+}
+
+// A small stroke icon, a check for success and a cross for failure
+function statusIcon(ok) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('class', 'icon status');
+  svg.setAttribute('aria-hidden', 'true');
+  path.setAttribute('d', ok ? 'M20 6 9 17l-5-5' : 'M18 6 6 18M6 6l12 12');
+  svg.append(path);
+  return svg;
 }
 
 function formatDate(date) {
@@ -82,14 +131,16 @@ function clamp(value, low, high) {
   return Math.max(low, Math.min(high, value));
 }
 
-function showMessage(text, isError = false) {
-  $('message').textContent = text;
+// The message over the map: empty state, loading, errors and logs with no map
+function showMessage(text, { isError = false, canOpen = false } = {}) {
   $('message').hidden = text === '';
   $('message').classList.toggle('error', isError);
+  $('message-text').textContent = text;
+  $('message-open').hidden = !canOpen;
 }
 
 function showError(error) {
-  showMessage(error.message, true);
+  showMessage(error.message, { isError: true, canOpen: true });
 }
 
 function stateAt(p) {
@@ -101,9 +152,12 @@ function turnAt(p) {
   return p < run.log.turns.length ? run.log.turns[p] : null;
 }
 
+function failedCount(turn) {
+  return turn.actions.filter((applied) => !applied.result.success).length;
+}
+
 function mapPosition() {
-  return $('after').checked ? Math.min(position + 1, run.count - 1) :
-    position;
+  return showAfter ? Math.min(position + 1, run.count - 1) : position;
 }
 
 async function start(log, name) {
@@ -154,18 +208,24 @@ function showSettings() {
   const agent = run.log.agent;
   const agentSeed = agent.settings && agent.settings.seed !== undefined ?
     agent.settings.seed : 'none';
+  const settings = [
+    ['agent', agent.name],
+    ['seed', options.seed],
+    ['agent seed', agentSeed],
+    ['level', LEVELS[options.level] ?? options.level],
+    ['disasters', options.disasters ? 'on' : 'off'],
+    ['months/turn', options.monthsPerTurn],
+    ['turns', run.log.turns.length],
+    ['max actions', options.maxActionsPerTurn],
+  ];
 
-  $('settings').textContent = [
-    run.name,
-    `agent ${agent.name}`,
-    `seed ${options.seed}`,
-    `agent seed ${agentSeed}`,
-    LEVELS[options.level] ?? `level ${options.level}`,
-    `disasters ${options.disasters ? 'on' : 'off'}`,
-    `${options.monthsPerTurn} months per turn`,
-    `${run.log.turns.length} turns`,
-    `up to ${options.maxActionsPerTurn} actions per turn`,
-  ].join(' · ');
+  $('file-name').textContent = run.name;
+  $('file-name').title = run.name;
+  $('run').replaceChildren(...settings.map(([name, value]) => {
+    const item = element('li', name + ' ');
+    item.append(element('span', String(value), 'value'));
+    return item;
+  }));
   document.title = `Replay: ${agent.name}, seed ${options.seed}`;
 }
 
@@ -185,17 +245,21 @@ function setPosition(p) {
 
   showActions();
   showState();
-  drawCharts();
   refreshMap();
+  drawTracks();
 }
 
 function showPosition() {
-  const label = (position < run.log.turns.length ? `Turn ${position}` :
-    'End') + ` · ${formatDate(stateAt(position).date)}`;
+  const date = formatDate(stateAt(position).date);
+  const ended = position >= run.log.turns.length;
   const shown = mapPosition();
+  const mapNote = shown === position ? '' :
+    ` · map of ${formatDate(stateAt(shown).date)}`;
 
-  $('position').textContent = shown === position ? label :
-    label + `, map of ${formatDate(stateAt(shown).date)}`;
+  $('position').textContent = (ended ? 'End' :
+    `Turn ${position} of ${run.log.turns.length}`) + ` · ${date}`;
+  $('viewport-turn').textContent = (ended ? 'End' : `Turn ${position}`) +
+    ` · ${date}${mapNote}`;
 }
 
 function refreshMap() {
@@ -213,7 +277,6 @@ function refreshMap() {
 function paintTiles() {
   const image = run.image.getContext('2d');
   const width = run.history.width;
-  const markPower = $('power').checked;
 
   for (let i = 0; i < run.tiles.length; i++) {
     const value = run.tiles[i];
@@ -258,6 +321,7 @@ function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   if (run === null || run.image === null) {
+    $('zoom').textContent = '';
     return;
   }
 
@@ -272,6 +336,7 @@ function render() {
 
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
   shapes.forEach(drawLabel);
+  $('zoom').textContent = Math.round(camera.zoom * 100) + '%';
 }
 
 function trace(points) {
@@ -279,8 +344,9 @@ function trace(points) {
   points.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
 }
 
-/* Successful actions are solid green, failed ones dashed red, and the
- * selected one yellow. The others fade while one is selected. */
+/* Successful actions are solid green, failed ones dashed red with their
+ * reason, and the selected one amber. The others fade while one is
+ * selected. */
 function drawShape(item) {
   const ok = item.applied.result.success;
   const picked = item.index === selected;
@@ -360,14 +426,14 @@ function drawLabel(item) {
 
   ctx.save();
   ctx.globalAlpha = selected >= 0 && !picked ? 0.35 : 1;
-  ctx.font = '600 11px system-ui, sans-serif';
+  ctx.font = `600 11px ${FONT_UI}`;
 
   const width = ctx.measureText(text).width + 8;
 
   ctx.fillStyle = picked ? COLORS.pick : result.success ? COLORS.ok :
     COLORS.fail;
   ctx.fillRect(x, y - 15, width, 15);
-  ctx.fillStyle = '#111';
+  ctx.fillStyle = COLORS.bg;
   ctx.fillText(text, x + 4, y - 4);
   ctx.restore();
 }
@@ -380,7 +446,7 @@ function drawHoverTile() {
   }
 
   ctx.save();
-  ctx.strokeStyle = '#ffffff';
+  ctx.strokeStyle = COLORS.fg;
   ctx.lineWidth = 1 / camera.zoom;
   ctx.setLineDash([]);
   ctx.strokeRect(tile.x * TILE_SIZE, tile.y * TILE_SIZE, TILE_SIZE,
@@ -408,25 +474,20 @@ function hoverTile() {
   return hover === null ? null : screenToTile(hover.sx, hover.sy);
 }
 
+// The status bar says what the tile under the pointer, or the tapped one, is
 function showHover() {
-  const box = $('hover');
   const tile = hoverTile();
 
-  if (tile === null || run.tiles === null) {
-    box.hidden = true;
+  if (tile === null || run === null || run.tiles === null) {
+    $('hover').textContent = run === null ? 'No log loaded' :
+      coarse.matches ? 'Tap a tile to see what it is' :
+      'Point at a tile to see what it is';
     return;
   }
 
   const value = run.tiles[tile.y * run.history.width + tile.x];
-  box.textContent = `${tile.x}, ${tile.y}: ` +
-    `${describeTile(value)} (tile ${tileIndex(value)})`;
-  box.hidden = false;
-
-  const area = $('map-area');
-  const left = hover.sx + 14 + box.offsetWidth > area.clientWidth ?
-    hover.sx - 14 - box.offsetWidth : hover.sx + 14;
-  box.style.left = Math.max(0, left) + 'px';
-  box.style.top = Math.max(0, hover.sy - 30) + 'px';
+  $('hover').textContent = `${tile.x}, ${tile.y} · ${describeTile(value)} ` +
+    `· tile ${tileIndex(value)}`;
 }
 
 function fit() {
@@ -457,6 +518,14 @@ function zoomAt(sx, sy, zoom) {
   render();
 }
 
+function zoomBy(factor) {
+  if (run !== null) {
+    zoomAt(canvas.clientWidth / 2, canvas.clientHeight / 2,
+      camera.zoom * factor);
+    showHover();
+  }
+}
+
 // Centres the map on a shape that is not fully in view
 function reveal(shape) {
   const tiles = shape.kind === 'area' ?
@@ -485,7 +554,7 @@ function select(index) {
 
   for (const item of $('actions').children) {
     const picked = Number(item.dataset.index) === selected;
-    item.classList.toggle('selected', picked);
+    item.querySelector('.row').setAttribute('aria-pressed', String(picked));
 
     if (picked) {
       item.scrollIntoView({ block: 'nearest' });
@@ -512,6 +581,11 @@ function clickAt(sx, sy) {
     (item) => shapeContains(item.shape, tile.x, tile.y));
 
   if (hit !== undefined) {
+    // With the panels in tabs, show the list the selection belongs to
+    if (narrow.matches) {
+      showTab('actions');
+    }
+
     select(hit.index);
   } else if (selected >= 0) {
     select(selected);
@@ -523,23 +597,35 @@ function showActions() {
   const turn = turnAt(position);
 
   list.replaceChildren();
-  $('turn-title').textContent = turn === null ? 'End of the game' :
-    `Actions of turn ${position}`;
 
   if (turn === null) {
+    $('actions-summary').textContent = 'end';
     $('actions-note').textContent = 'The game is over.';
     return;
   }
 
+  const failed = failedCount(turn);
+  $('actions-summary').textContent = `turn ${position} · ` +
+    `${turn.actions.length} played` + (failed > 0 ? `, ${failed} failed` : '');
+
   turn.actions.forEach((applied, index) => {
+    const ok = applied.result.success;
     const item = document.createElement('li');
+    const row = document.createElement('button');
+
     item.dataset.index = String(index);
-    item.className = applied.result.success ? '' : 'failed';
-    item.append(
+    item.className = ok ? 'ok' : 'failed';
+    row.type = 'button';
+    row.className = 'row';
+    row.setAttribute('aria-pressed', 'false');
+    row.append(
       element('span', String(index + 1), 'n'),
+      statusIcon(ok),
       element('span', describeAction(applied.action), 'what'),
-      element('span', describeResult(applied.result), 'result'));
-    item.addEventListener('click', () => select(index));
+      element('span', (ok ? '' : 'failed: ') + describeResult(applied.result),
+        'result'));
+    row.addEventListener('click', () => select(index));
+    item.append(row);
     list.append(item);
   });
 
@@ -558,7 +644,7 @@ function showActions() {
 
 // A bar from the left, or from the middle for values that can be negative
 function bar(name, value, max, color, centred) {
-  const track = element('div', '', 'track' + (centred ? ' centred' : ''));
+  const track = element('div', '', 'bar' + (centred ? ' centred' : ''));
   const fill = element('div', '', 'fill');
   const share = clamp(value / max, centred ? -1 : 0, 1);
 
@@ -576,11 +662,19 @@ function bar(name, value, max, color, centred) {
     element('span', formatNumber(value), 'value')];
 }
 
+function keyValues(rows) {
+  return rows.flatMap(([name, value]) =>
+    [element('dt', name), element('dd', value)]);
+}
+
 function showState() {
   const state = stateAt(position);
   const turn = turnAt(position);
   const zones = state.poweredZoneCount + state.unpoweredZoneCount;
-  const rows = [
+
+  $('date').textContent = formatDate(state.date) +
+    (position < run.log.turns.length ? ' · start of turn' : ' · end');
+  $('state').replaceChildren(...keyValues([
     ['Funds', formatMoney(state.funds)],
     ['Population', formatNumber(state.population)],
     ['Score', formatNumber(state.score)],
@@ -589,12 +683,7 @@ function showState() {
     ['Approval', state.approval + '%'],
     ['Tax rate', state.taxRate + '%'],
     ['Powered zones', `${state.poweredZoneCount} of ${zones}`],
-  ];
-
-  $('date').textContent = formatDate(state.date) +
-    (position < run.log.turns.length ? ', start of the turn' : ', end');
-  $('state').replaceChildren(...rows.flatMap(([name, value]) =>
-    [element('dt', name), element('dd', value)]));
+  ]));
 
   // The valves run from -2000 to 2000 for residential, 1500 for the others
   $('rci').replaceChildren(
@@ -602,13 +691,18 @@ function showState() {
     ...bar('Commercial', state.rci.commercial, 1500, 'var(--com)', true),
     ...bar('Industrial', state.rci.industrial, 1500, 'var(--ind)', true));
   $('problems').replaceChildren(...PROBLEMS.flatMap(([key, name]) =>
-    bar(name, state.problems[key], 255, '#c76b6b', false)));
+    bar(name, state.problems[key], 255, 'var(--problem)', false)));
 
   const windows = $('windows');
   windows.replaceChildren();
 
   if (turn !== null && turn.budgetWindows.length > 0) {
+    const box = document.createElement('details');
     const list = element('ul', '', 'windows');
+
+    box.open = true;
+    box.append(element('summary',
+      `Budget windows (${turn.budgetWindows.length})`), list);
 
     for (const record of turn.budgetWindows) {
       list.append(element('li', `${formatDate(record.date)}: funds ` +
@@ -617,81 +711,217 @@ function showState() {
         `police ${record.police}%`));
     }
 
-    windows.append(element('h3', 'Budget windows in this turn'), list);
+    windows.append(box);
   }
 
-  $('report').textContent = turn !== null && turn.agent !== null ?
-    JSON.stringify(turn.agent) : 'none';
+  const report = turn !== null && turn.agent !== null ?
+    Object.entries(turn.agent).map(([name, value]) => [name,
+      typeof value === 'object' ? JSON.stringify(value) : String(value)]) :
+    [['report', 'none']];
+  $('report').replaceChildren(...keyValues(report));
 }
 
-function chartX(index, count, width) {
-  return CHART_PAD + (count > 1 ? index / (count - 1) : 0) *
-    (width - 2 * CHART_PAD);
+function trackX(p, width) {
+  return TRACK_PAD + (run.count > 1 ? p / (run.count - 1) : 0) *
+    (width - 2 * TRACK_PAD);
 }
 
-function drawChart(chart, values, color, title, label) {
-  const ratio = window.devicePixelRatio || 1;
-  const width = chart.clientWidth;
-  const height = chart.clientHeight;
-  const context = chart.getContext('2d');
+function trackPosition(x, width) {
+  return clamp(Math.round((x - TRACK_PAD) / (width - 2 * TRACK_PAD) *
+    (run.count - 1)), 0, run.count - 1);
+}
+
+// A line with a light area under it, scaled to the largest value
+function drawSeries(context, lane, values, color, width) {
   const max = Math.max(1, ...values);
-  const y = (value) => height - CHART_PAD -
-    Math.max(0, value) / max * (height - 2 * CHART_PAD - 12);
+  const bottom = lane.top + lane.height - 1;
+  const y = (value) => bottom - Math.max(0, value) / max *
+    (lane.height - 15);
 
-  chart.width = Math.max(1, Math.round(width * ratio));
-  chart.height = Math.max(1, Math.round(height * ratio));
-  context.setTransform(ratio, 0, 0, ratio, 0, 0);
-  context.fillStyle = '#20252d';
-  context.fillRect(0, 0, width, height);
-
+  context.beginPath();
+  values.forEach((value, i) => i === 0 ?
+    context.moveTo(trackX(i, width), y(value)) :
+    context.lineTo(trackX(i, width), y(value)));
   context.strokeStyle = color;
   context.lineWidth = 1.5;
-  context.beginPath();
-  values.forEach((value, i) => {
-    const x = chartX(i, values.length, width);
-    return i === 0 ? context.moveTo(x, y(value)) : context.lineTo(x, y(value));
-  });
   context.stroke();
+  context.lineTo(trackX(values.length - 1, width), bottom);
+  context.lineTo(trackX(0, width), bottom);
+  context.closePath();
+  context.globalAlpha = 0.2;
+  context.fillStyle = color;
+  context.fill();
+  context.globalAlpha = 1;
 
-  context.fillStyle = '#9aa3ad';
-  context.font = '10px system-ui, sans-serif';
-  context.fillText('max ' + label(max), CHART_PAD + 2, 11);
+  context.beginPath();
+  context.arc(trackX(position, width), y(values[position]), 3, 0,
+    2 * Math.PI);
+  context.fill();
+  return max;
+}
 
-  const x = chartX(position, values.length, width);
+// The name and value on the left, and a note on the right if it fits
+function laneLabel(context, lane, name, value, note, width) {
+  const valueX = TRACK_PAD + 2 + context.measureText(name + ' ').width;
+  const end = valueX + context.measureText(value).width;
+  const noteX = width - TRACK_PAD - 2 - context.measureText(note).width;
+
+  context.fillStyle = COLORS.muted;
+  context.fillText(name, TRACK_PAD + 2, lane.top + 2);
+  context.fillStyle = COLORS.fg;
+  context.fillText(value, valueX, lane.top + 2);
+
+  if (note !== '' && noteX > end + 16) {
+    context.fillStyle = COLORS.muted;
+    context.fillText(note, noteX, lane.top + 2);
+  }
+}
+
+/* Three lanes under the slider: the actions of each turn (failed ones in
+ * red, a mark where a budget window opened), the population and the funds.
+ * Then the January of every year, and the current turn across all. */
+function drawTracks() {
+  const ratio = window.devicePixelRatio || 1;
+  const width = tracks.clientWidth;
+  const height = tracks.clientHeight;
+  const context = tracks.getContext('2d');
+
+  tracks.width = Math.max(1, Math.round(width * ratio));
+  tracks.height = Math.max(1, Math.round(height * ratio));
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  context.clearRect(0, 0, width, height);
+
+  if (run === null) {
+    return;
+  }
+
+  context.font = `11px ${FONT_MONO}`;
+  context.textBaseline = 'top';
+
+  for (const lane of Object.values(LANES)) {
+    context.fillStyle = COLORS.lane;
+    context.fillRect(0, lane.top, width, lane.height);
+  }
+
+  const lane = LANES.actions;
+  const step = (width - 2 * TRACK_PAD) / Math.max(1, run.count - 1);
+  const barWidth = clamp(step * 0.6, 1, 6);
+  const room = lane.height - 15;
+  const limit = Math.max(1, run.log.options.maxActionsPerTurn);
+  const bottom = lane.top + lane.height - 1;
+
+  run.log.turns.forEach((turn, p) => {
+    const x = trackX(p, width) - barWidth / 2;
+    const played = room * Math.min(1, turn.actions.length / limit);
+    const failed = room * Math.min(1, failedCount(turn) / limit);
+
+    context.fillStyle = COLORS.bar;
+    context.fillRect(x, bottom - played, barWidth, played);
+    context.fillStyle = COLORS.fail;
+    context.fillRect(x, bottom - failed, barWidth, failed);
+
+    if (turn.budgetWindows.length > 0) {
+      context.fillStyle = COLORS.window;
+      context.fillRect(x, lane.top + 13, barWidth, 3);
+    }
+  });
+
+  const turn = turnAt(position);
+  laneLabel(context, lane, 'ACTIONS', turn === null ? 'end' :
+    `${turn.actions.length} played, ${failedCount(turn)} failed`,
+    'red: failed, blue: budget window', width);
+
+  const population = drawSeries(context, LANES.population, run.population,
+    COLORS.population, width);
+  const funds = drawSeries(context, LANES.funds, run.funds, COLORS.funds,
+    width);
+  laneLabel(context, LANES.population, 'POPULATION',
+    formatNumber(run.population[position]), 'max ' + formatNumber(population),
+    width);
+  laneLabel(context, LANES.funds, 'FUNDS', formatMoney(run.funds[position]),
+    'max ' + formatMoney(funds), width);
+
+  drawYears(context, width, height);
+
   context.strokeStyle = COLORS.pick;
   context.lineWidth = 1;
   context.beginPath();
-  context.moveTo(x, 0);
-  context.lineTo(x, height);
+  context.moveTo(Math.round(trackX(position, width)) + 0.5, 0);
+  context.lineTo(Math.round(trackX(position, width)) + 0.5, AXIS_TOP);
   context.stroke();
-  context.fillStyle = COLORS.pick;
-  context.beginPath();
-  context.arc(x, y(values[position]), 3, 0, 2 * Math.PI);
-  context.fill();
 
-  title.textContent = `${title.dataset.name}: ${label(values[position])}`;
+  if (trackHover !== null && trackHover !== position) {
+    context.strokeStyle = COLORS.muted;
+    context.setLineDash([3, 3]);
+    context.beginPath();
+    context.moveTo(Math.round(trackX(trackHover, width)) + 0.5, 0);
+    context.lineTo(Math.round(trackX(trackHover, width)) + 0.5, AXIS_TOP);
+    context.stroke();
+    context.setLineDash([]);
+  }
 }
 
-function drawCharts() {
-  if (run === null) {
+// A tick at every January, with the year where there is room for it
+function drawYears(context, width, height) {
+  let lastLabel = -Infinity;
+
+  context.fillStyle = COLORS.muted;
+  context.strokeStyle = COLORS.muted;
+
+  for (let p = 0; p < run.count; p++) {
+    const date = stateAt(p).date;
+
+    if (date.month !== 0) {
+      continue;
+    }
+
+    const x = Math.round(trackX(p, width)) + 0.5;
+    context.beginPath();
+    context.moveTo(x, AXIS_TOP);
+    context.lineTo(x, AXIS_TOP + 3);
+    context.stroke();
+
+    const label = String(date.year);
+    const labelWidth = context.measureText(label).width;
+    const left = clamp(x - labelWidth / 2, 0, width - labelWidth);
+
+    if (left > lastLabel + 8 && AXIS_TOP + 4 + 11 <= height) {
+      context.fillText(label, left, AXIS_TOP + 4);
+      lastLabel = left + labelWidth;
+    }
+  }
+}
+
+function showTrackTip(x) {
+  const tip = $('track-tip');
+
+  if (trackHover === null) {
+    tip.hidden = true;
     return;
   }
 
-  drawChart($('population-chart'), run.population, '#6fc3ff',
-    $('population-title'), formatNumber);
-  drawChart($('funds-chart'), run.funds, '#7ee08a', $('funds-title'),
-    formatMoney);
+  const p = trackHover;
+  const turn = turnAt(p);
+  const lines = [
+    (turn === null ? 'End' : `Turn ${p}`) + ` · ${formatDate(stateAt(p).date)}`,
+    turn === null ? 'no actions' : `${turn.actions.length} played, ` +
+      `${failedCount(turn)} failed` +
+      (turn.budgetWindows.length > 0 ? ', budget window' : ''),
+    `population ${formatNumber(run.population[p])}`,
+    `funds ${formatMoney(run.funds[p])}`,
+  ];
+
+  tip.textContent = lines.join('\n');
+  tip.hidden = false;
+
+  const room = tip.parentElement.clientWidth;
+  tip.style.left = clamp(x + 12, 0, room - tip.offsetWidth) + 'px';
+  tip.style.top = (tracks.offsetTop - tip.offsetHeight - 4) + 'px';
 }
 
-function chartClick(event) {
-  if (run === null) {
-    return;
-  }
-
-  const rect = event.currentTarget.getBoundingClientRect();
-  const share = (event.clientX - rect.left - CHART_PAD) /
-    (rect.width - 2 * CHART_PAD);
-  setPosition(clamp(share, 0, 1) * (run.count - 1));
+function tracksEvent(event) {
+  const rect = tracks.getBoundingClientRect();
+  return { x: event.clientX - rect.left, width: rect.width };
 }
 
 function play() {
@@ -703,7 +933,8 @@ function play() {
     setPosition(0);
   }
 
-  $('play').textContent = 'Pause';
+  $('play').setAttribute('aria-pressed', 'true');
+  $('play').setAttribute('aria-label', 'Pause');
   tick();
 }
 
@@ -722,7 +953,8 @@ function tick() {
 function stop() {
   clearTimeout(timer);
   timer = null;
-  $('play').textContent = 'Play';
+  $('play').setAttribute('aria-pressed', 'false');
+  $('play').setAttribute('aria-label', 'Play');
 }
 
 function togglePlay() {
@@ -751,15 +983,26 @@ function resize() {
   } else {
     render();
   }
+}
 
-  drawCharts();
+function showTab(name) {
+  workspace.dataset.tab = name;
+  $('tab-actions').setAttribute('aria-selected', String(name === 'actions'));
+  $('tab-inspector').setAttribute('aria-selected',
+    String(name === 'inspector'));
+}
+
+function togglePanel(name, button) {
+  const on = workspace.dataset[name] !== 'on';
+  workspace.dataset[name] = on ? 'on' : 'off';
+  button.setAttribute('aria-pressed', String(on));
 }
 
 // Buttons give the focus back, so Space stays play and pause
 function onButton(id, action) {
   $(id).addEventListener('click', (event) => {
     event.currentTarget.blur();
-    action();
+    action(event.currentTarget);
   });
 }
 
@@ -769,29 +1012,33 @@ onButton('play', togglePlay);
 onButton('forward', () => setPosition(position + 1));
 onButton('last', () => setPosition(run === null ? 0 : run.count - 1));
 onButton('fit', fit);
+onButton('zoom-in', () => zoomBy(ZOOM_STEP));
+onButton('zoom-out', () => zoomBy(1 / ZOOM_STEP));
 onButton('open', () => $('file').click());
-
-$('population-title').dataset.name = 'Population';
-$('funds-title').dataset.name = 'Funds';
-$('population-chart').addEventListener('click', chartClick);
-$('funds-chart').addEventListener('click', chartClick);
-
-slider.addEventListener('input', () => setPosition(Number(slider.value)));
-$('after').addEventListener('change', (event) => {
-  event.currentTarget.blur();
+onButton('message-open', () => $('file').click());
+onButton('tab-actions', () => showTab('actions'));
+onButton('tab-inspector', () => showTab('inspector'));
+onButton('toggle-actions', (button) => togglePanel('actions', button));
+onButton('toggle-inspector', (button) => togglePanel('inspector', button));
+onButton('after', (button) => {
+  showAfter = !showAfter;
+  button.setAttribute('aria-pressed', String(showAfter));
 
   if (run !== null) {
     refreshMap();
   }
 });
-$('power').addEventListener('change', (event) => {
-  event.currentTarget.blur();
+onButton('power', (button) => {
+  markPower = !markPower;
+  button.setAttribute('aria-pressed', String(markPower));
 
   if (run !== null && run.history !== null) {
     paintTiles();
     render();
   }
 });
+
+slider.addEventListener('input', () => setPosition(Number(slider.value)));
 $('file').addEventListener('change', (event) => {
   if (event.currentTarget.files.length > 0) {
     openFile(event.currentTarget.files[0]);
@@ -799,12 +1046,15 @@ $('file').addEventListener('change', (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
-  if (run === null || event.target instanceof HTMLSelectElement) {
+  const target = event.target;
+
+  if (run === null || target instanceof HTMLSelectElement) {
     return;
   }
 
-  // The slider steps by itself when it has the focus
-  const onSlider = event.target === slider;
+  // The slider steps by itself, and an action row selects itself
+  const onSlider = target === slider;
+  const onRow = target instanceof HTMLElement && target.classList.contains('row');
 
   if (event.key === 'ArrowLeft' && !onSlider) {
     setPosition(position - 1);
@@ -814,8 +1064,14 @@ document.addEventListener('keydown', (event) => {
     setPosition(0);
   } else if (event.key === 'End' && !onSlider) {
     setPosition(run.count - 1);
-  } else if (event.key === ' ') {
+  } else if (event.key === ' ' && !onRow) {
     togglePlay();
+  } else if (event.key === '+' || event.key === '=') {
+    zoomBy(ZOOM_STEP);
+  } else if (event.key === '-') {
+    zoomBy(1 / ZOOM_STEP);
+  } else if (event.key === 'f' || event.key === 'F') {
+    fit();
   } else {
     return;
   }
@@ -872,24 +1128,75 @@ canvas.addEventListener('pointermove', (event) => {
     }
   }
 
-  hover = { sx: event.offsetX, sy: event.offsetY };
+  if (event.pointerType === 'mouse' || drag !== null) {
+    hover = { sx: event.offsetX, sy: event.offsetY };
+  }
+
   showHover();
   render();
 });
 
+// A tap selects what is under it and shows the tile in the status bar
 canvas.addEventListener('pointerup', (event) => {
   if (drag !== null && !drag.moved) {
+    hover = { sx: event.offsetX, sy: event.offsetY };
     clickAt(event.offsetX, event.offsetY);
+    showHover();
   }
 
   drag = null;
   canvas.classList.remove('dragging');
 });
 
-canvas.addEventListener('pointerleave', () => {
-  hover = null;
-  showHover();
-  render();
+canvas.addEventListener('pointerleave', (event) => {
+  if (event.pointerType === 'mouse') {
+    hover = null;
+    showHover();
+    render();
+  }
+});
+
+tracks.addEventListener('pointerdown', (event) => {
+  if (run === null || event.button !== 0) {
+    return;
+  }
+
+  scrubbing = true;
+  tracks.setPointerCapture(event.pointerId);
+  const point = tracksEvent(event);
+  setPosition(trackPosition(point.x, point.width));
+});
+
+tracks.addEventListener('pointermove', (event) => {
+  if (run === null) {
+    return;
+  }
+
+  const point = tracksEvent(event);
+  const p = trackPosition(point.x, point.width);
+
+  if (scrubbing && p !== position) {
+    setPosition(p);
+  }
+
+  trackHover = p;
+  drawTracks();
+  showTrackTip(point.x);
+});
+
+tracks.addEventListener('pointerup', () => {
+  scrubbing = false;
+});
+
+tracks.addEventListener('pointerleave', () => {
+  trackHover = null;
+  scrubbing = false;
+
+  if (run !== null) {
+    drawTracks();
+  }
+
+  showTrackTip(0);
 });
 
 document.addEventListener('dragover', (event) => {
@@ -913,13 +1220,14 @@ document.addEventListener('drop', (event) => {
 });
 
 new ResizeObserver(resize).observe(canvas);
-window.addEventListener('resize', drawCharts);
+new ResizeObserver(drawTracks).observe(tracks);
+showHover();
 
 const params = new URLSearchParams(window.location.search);
 const logUrl = params.get('log');
 
 if (logUrl !== null) {
-  showMessage('Loading ' + logUrl);
+  showMessage('Loading ' + (params.get('name') ?? logUrl));
   fetch(logUrl)
     .then((response) => {
       if (!response.ok) {
@@ -930,4 +1238,6 @@ if (logUrl !== null) {
     })
     .then((log) => start(log, params.get('name') ?? logUrl))
     .catch(showError);
+} else {
+  showMessage('Drop a run log here, or open one.', { canOpen: true });
 }

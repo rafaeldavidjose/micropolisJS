@@ -413,45 +413,61 @@ from the internet, so it works offline. Another log can be opened with
 Open log or dropped on the page. The page needs the server, because
 browsers do not load its JavaScript modules from a `file://` address.
 
+The layout follows a debugger or a profiler more than a web page. The map
+takes the middle and most of the screen. Its toolbar has Fit, zoom out
+and zoom in, After turn and Unpowered, and the turn on the right. Below
+the map a status bar says what the tile under the pointer is, or the
+last tapped one, with the zoom. The actions of the turn are on the left
+and the inspector on the right. On a wide screen the Actions and
+Inspector buttons in the title bar hide them, so the map gets the whole
+width. Below 1200 pixels the two share one panel with tabs, and on a
+phone the map, the timeline and that panel follow each other in one
+column. The title bar has the file and the run settings: agent, seeds,
+level, disasters, months per turn, number of turns and the action limit.
+The colours are named values at the top of `viewer/style.css`, and the
+page uses the system fonts.
+
 The map is drawn with `images/tiles.png`, the tile sheet of the browser
 game. Each raw value is masked with `BIT_MASK` to get the tile number, as
 the engine does. A zone centre without power shows the lightning bolt the
-browser blinks there, without the blinking. The Unpowered zones checkbox
-turns it off. Nothing else is animated either.
+browser blinks there, without the blinking. The Unpowered toggle turns it
+off. Nothing else is animated either.
 
-The timeline has a slider, buttons to step one turn back and forward,
-and Play with a speed from 0.5 to 16 turns per second. The arrow keys
-step, Home and End jump to the start and the end, and Space plays and
-pauses. The wheel zooms around the pointer, dragging pans, and Fit shows
-the whole map again.
+The timeline at the bottom has the buttons to go to the start, step back,
+play, step forward and go to the end, the turn and date, the speed from
+0.5 to 16 turns per second, and the slider. Under the slider three tracks
+share its x axis: the actions of every turn as bars, with the failed ones
+in red and a blue mark where a budget window opened, then the population
+and the funds. A line marks the current turn on all three. Hovering a
+track shows the values of a turn, and a click or a drag jumps there. The
+arrow keys step, Home and End jump to the start and the end, Space plays
+and pauses, + and - zoom, and F fits the map. The wheel zooms around the
+pointer and dragging pans.
 
-Each turn shows the map the agent saw at the start of the turn. With Map
-after the turn it shows the map at the start of the next turn instead,
-with the new buildings. The actions of the turn are marked on the map
-with their number. A building or a bulldozed tile is outlined over its
-site, and a route is drawn along its tiles. Successful actions are solid
-green, failed ones dashed red with their reason. A route without a plan
-is drawn as a straight line between its ends. The list on the left has
-every action of the turn with its cost or its reason. Clicking an action
-in the list or on the map selects it, fades the others and brings it
-into view.
+Each turn shows the map the agent saw at the start of the turn. With
+After turn it shows the map at the start of the next turn instead, with
+the new buildings, and the turn label says which date the map is from.
+The actions of the turn are marked on the map with their number. A
+building or a bulldozed tile is outlined over its site, and a route is
+drawn along its tiles. Successful actions are solid green, failed ones
+dashed red with their reason. A route without a plan is drawn as a
+straight line between its ends. The list marks each action with a check
+or a cross and gives its cost, or the reason it failed. Clicking an
+action in the list or on the map selects it, fades the others and brings
+it into view.
 
-The panel on the right has the state at the start of the turn: date,
-funds, population, score, city class, approval, tax rate, powered zones,
-RCI demand and the seven problems, then the budget windows answered
-during the turn and the agent's report. Two line charts show the
-population and the funds over the whole game with a marker at the turn.
-Clicking a chart jumps to that point. Hovering a tile shows its
-coordinates and what it is. The kind comes from the tile ranges of the
-query tool (`classifyZone` in `src/queryTool.js`). A detail is added
-where the tile number says more, like shore, bridge, traffic, empty zone,
-hospital or church, and the flags add the zone centre and the power. The
-top bar has the agent, the seeds, the level, the disasters option, the
-months per turn, the number of turns and the action limit.
+The inspector has the state at the start of the turn: date, funds,
+population, score, city class, approval, tax rate, powered zones, RCI
+demand and the seven problems, then the budget windows answered during
+the turn and the agent's report. The status bar says what a tile is. The
+kind comes from the tile ranges of the query tool (`classifyZone` in
+`src/queryTool.js`). A detail is added where the tile number says more,
+like shore, bridge, traffic, empty zone, hospital or church, and the
+flags add the zone centre and the power.
 
 Tornadoes, monsters, planes, helicopters, ships and trains are sprites,
 and sprites are not in the log. The viewer cannot show them and says so
-on the map. The damage they do is in the tiles.
+in the status bar and the inspector. The damage they do is in the tiles.
 
 `viewer/replay.js` rebuilds the map of a turn from the first map and the
 changes. It keeps a full copy every 16 turns, so a jump replays at most

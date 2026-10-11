@@ -8,72 +8,153 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <strong>Replay viewer</strong>
-    <span id="settings" class="settings">No log loaded</span>
-    <button id="open" type="button">Open log</button>
+  <header class="titlebar">
+    <h1 class="app">Replay</h1>
+    <span id="file-name" class="file">no log</span>
+    <ul id="run" class="run" aria-label="Run settings"></ul>
+    <div class="titlebar-tools">
+      <button id="toggle-actions" class="tool panel-toggle" type="button"
+              aria-pressed="true" title="Show or hide the actions panel">Actions</button>
+      <button id="toggle-inspector" class="tool panel-toggle" type="button"
+              aria-pressed="true" title="Show or hide the inspector">Inspector</button>
+      <button id="open" class="tool" type="button" title="Open a run log">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-8l-2-3H4a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1Z"/></svg>
+        Open log
+      </button>
+    </div>
     <input id="file" type="file" accept=".json,application/json" hidden>
   </header>
 
-  <main>
-    <section class="panel" id="actions-panel">
-      <h2 id="turn-title">Actions</h2>
-      <ol id="actions" class="actions"></ol>
-      <p id="actions-note" class="note"></p>
-    </section>
-
-    <section id="map-area">
-      <canvas id="map"></canvas>
-      <div id="hover" class="hover" hidden></div>
-      <div id="message" class="message">
-        Drop a run log here, or use Open log.
+  <main id="workspace" class="workspace" data-tab="actions"
+        data-actions="on" data-inspector="on">
+    <section class="viewport" aria-label="Map">
+      <div class="viewport-bar" role="toolbar" aria-label="Map tools">
+        <button id="fit" class="tool" type="button" title="Fit the whole map (F)">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H4v4M16 3h4v4M8 21H4v-4M16 21h4v-4"/></svg>
+          Fit
+        </button>
+        <button id="zoom-out" class="tool icon-only" type="button"
+                aria-label="Zoom out" title="Zoom out (-)">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+        </button>
+        <button id="zoom-in" class="tool icon-only" type="button"
+                aria-label="Zoom in" title="Zoom in (+)">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg>
+        </button>
+        <span class="separator" aria-hidden="true"></span>
+        <button id="after" class="tool toggle" type="button" aria-pressed="false"
+                title="Show the map at the end of the turn">After turn</button>
+        <button id="power" class="tool toggle" type="button" aria-pressed="true"
+                title="Mark zones without power with a lightning bolt">Unpowered</button>
+        <span id="viewport-turn" class="viewport-turn"></span>
       </div>
-      <p class="sprites-note">
-        Sprites (tornadoes, monsters, planes, helicopters, ships and trains)
-        are not in the log, so they are not shown.
-      </p>
+      <div class="stage">
+        <canvas id="map"></canvas>
+        <div id="message" class="message">
+          <p id="message-text">Drop a run log here, or open one.</p>
+          <button id="message-open" class="tool" type="button">Open log</button>
+        </div>
+      </div>
+      <footer class="statusbar">
+        <span id="hover" class="readout">Point at a tile to see what it is</span>
+        <span id="zoom" class="zoom" title="Zoom, 100% is one screen pixel per tile pixel"></span>
+        <span class="sprites" title="Tornadoes, monsters, planes, helicopters, ships and trains are sprites. Sprites are not in the log, so they are not shown.">No sprites in the log</span>
+      </footer>
     </section>
 
-    <section class="panel" id="state-panel">
-      <h2 id="date">State</h2>
-      <dl id="state" class="state"></dl>
-      <h3>Demand</h3>
-      <div id="rci" class="bars"></div>
-      <h3>Problems</h3>
-      <div id="problems" class="bars"></div>
-      <h3 id="population-title">Population</h3>
-      <canvas id="population-chart" class="chart"></canvas>
-      <h3 id="funds-title">Funds</h3>
-      <canvas id="funds-chart" class="chart"></canvas>
-      <div id="windows"></div>
-      <h3>Agent report</h3>
-      <pre id="report" class="report"></pre>
+    <aside id="side" class="side">
+      <div class="tabs" role="tablist" aria-label="Panels">
+        <button id="tab-actions" class="tab" type="button" role="tab"
+                aria-selected="true" aria-controls="actions-panel">Actions</button>
+        <button id="tab-inspector" class="tab" type="button" role="tab"
+                aria-selected="false" aria-controls="inspector">Inspector</button>
+      </div>
+
+      <section id="actions-panel" class="panel actions-panel" role="tabpanel"
+               aria-labelledby="actions-title">
+        <header class="panel-head">
+          <h2 id="actions-title">Actions</h2>
+          <span id="actions-summary" class="meta"></span>
+        </header>
+        <ol id="actions" class="actions"></ol>
+        <p id="actions-note" class="note"></p>
+      </section>
+
+      <section id="inspector" class="panel inspector" role="tabpanel"
+               aria-labelledby="inspector-title">
+        <header class="panel-head">
+          <h2 id="inspector-title">Inspector</h2>
+          <span id="date" class="meta"></span>
+        </header>
+        <details open>
+          <summary>State</summary>
+          <dl id="state" class="kv"></dl>
+        </details>
+        <details open>
+          <summary>Demand</summary>
+          <div id="rci" class="bars"></div>
+        </details>
+        <details open>
+          <summary>Problems</summary>
+          <div id="problems" class="bars"></div>
+        </details>
+        <div id="windows"></div>
+        <details open>
+          <summary>Agent report</summary>
+          <dl id="report" class="kv"></dl>
+        </details>
+        <p class="note">
+          Sprites (tornadoes, monsters, planes, helicopters, ships and trains)
+          are not in the log, so they are not shown. Their damage is in the
+          tiles.
+        </p>
+      </section>
+    </aside>
+
+    <section class="timeline" aria-label="Timeline">
+      <div class="transport">
+        <button id="first" class="tool icon-only" type="button"
+                aria-label="First turn" title="First turn (Home)">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 19 9 12l9-7v14ZM6 5v14"/></svg>
+        </button>
+        <button id="back" class="tool icon-only" type="button"
+                aria-label="One turn back" title="One turn back (Left)">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <button id="play" class="tool icon-only play" type="button"
+                aria-label="Play" title="Play or pause (Space)">
+          <svg class="icon icon-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16l13-8L7 4Z"/></svg>
+          <svg class="icon icon-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
+        </button>
+        <button id="forward" class="tool icon-only" type="button"
+                aria-label="One turn forward" title="One turn forward (Right)">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+        <button id="last" class="tool icon-only" type="button"
+                aria-label="End of the game" title="End of the game (End)">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 5 9 7-9 7V5ZM18 5v14"/></svg>
+        </button>
+        <output id="position" class="position" for="slider">no log</output>
+        <label class="speed">Speed
+          <select id="speed">
+            <option value="0.5">0.5 turns/s</option>
+            <option value="1">1 turn/s</option>
+            <option value="2">2 turns/s</option>
+            <option value="4" selected>4 turns/s</option>
+            <option value="8">8 turns/s</option>
+            <option value="16">16 turns/s</option>
+          </select>
+        </label>
+      </div>
+      <div class="scrubber">
+        <input id="slider" type="range" min="0" max="0" value="0" step="1"
+               aria-label="Turn">
+        <canvas id="tracks" class="tracks" role="img"
+                aria-label="Actions per turn, population and funds over the game. Click or drag to jump to a turn."></canvas>
+        <div id="track-tip" class="track-tip" hidden></div>
+      </div>
     </section>
   </main>
-
-  <footer>
-    <button id="first" type="button" title="First turn (Home)">|&lt;</button>
-    <button id="back" type="button" title="One turn back (Left)">&lt;</button>
-    <button id="play" type="button" title="Play or pause (Space)">Play</button>
-    <button id="forward" type="button" title="One turn forward (Right)">&gt;</button>
-    <button id="last" type="button" title="End of the game (End)">&gt;|</button>
-    <input id="slider" type="range" min="0" max="0" value="0" step="1"
-           aria-label="Turn">
-    <span id="position" class="position">Turn 0</span>
-    <label>Speed
-      <select id="speed">
-        <option value="0.5">0.5 turns/s</option>
-        <option value="1">1 turn/s</option>
-        <option value="2">2 turns/s</option>
-        <option value="4" selected>4 turns/s</option>
-        <option value="8">8 turns/s</option>
-        <option value="16">16 turns/s</option>
-      </select>
-    </label>
-    <label><input id="after" type="checkbox"> Map after the turn</label>
-    <label><input id="power" type="checkbox" checked> Unpowered zones</label>
-    <button id="fit" type="button" title="Fit the map">Fit</button>
-  </footer>
 
   <script type="module" src="viewer.js"></script>
 </body>
