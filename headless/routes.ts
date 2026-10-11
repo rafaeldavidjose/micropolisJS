@@ -320,31 +320,31 @@ function canEverUse(rules: ToolRules, map: MapLike, x: number,
   return rules.hasKind(value) || isWater(ground) || rules.onLand.has(ground);
 }
 
-function comesFirst(a: QueueEntry, b: QueueEntry): boolean {
-  if (a.cost !== b.cost) {
-    return a.cost < b.cost;
+function comesFirst(first: QueueEntry, second: QueueEntry): boolean {
+  if (first.cost !== second.cost) {
+    return first.cost < second.cost;
   }
 
-  if (a.length !== b.length) {
-    return a.length < b.length;
+  if (first.length !== second.length) {
+    return first.length < second.length;
   }
 
-  return a.order < b.order;
+  return first.order < second.order;
 }
 
 function pushEntry(heap: QueueEntry[], entry: QueueEntry): void {
   heap.push(entry);
-  let i: number = heap.length - 1;
+  let index: number = heap.length - 1;
 
-  while (i > 0) {
-    const parent: number = (i - 1) >> 1;
+  while (index > 0) {
+    const parent: number = (index - 1) >> 1;
 
-    if (!comesFirst(heap[i], heap[parent])) {
+    if (!comesFirst(heap[index], heap[parent])) {
       break;
     }
 
-    [heap[i], heap[parent]] = [heap[parent], heap[i]];
-    i = parent;
+    [heap[index], heap[parent]] = [heap[parent], heap[index]];
+    index = parent;
   }
 }
 
@@ -354,12 +354,12 @@ function popEntry(heap: QueueEntry[]): QueueEntry {
 
   if (heap.length > 0) {
     heap[0] = last;
-    let i: number = 0;
+    let index: number = 0;
 
     for (;;) {
-      const left: number = 2 * i + 1;
+      const left: number = 2 * index + 1;
       const right: number = left + 1;
-      let first: number = i;
+      let first: number = index;
 
       if (left < heap.length && comesFirst(heap[left], heap[first])) {
         first = left;
@@ -369,12 +369,12 @@ function popEntry(heap: QueueEntry[]): QueueEntry {
         first = right;
       }
 
-      if (first === i) {
+      if (first === index) {
         break;
       }
 
-      [heap[i], heap[first]] = [heap[first], heap[i]];
-      i = first;
+      [heap[index], heap[first]] = [heap[first], heap[index]];
+      index = first;
     }
   }
 
@@ -506,18 +506,18 @@ function layWithTool(city: SimulationLike, tool: ToolLike,
   const costs: number[] = [];
   tool.clear();
 
-  for (let i: number = 0; i < tiles.length; i++) {
-    if (tiles[i].kind === 'existing') {
+  for (let index: number = 0; index < tiles.length; index++) {
+    if (tiles[index].kind === 'existing') {
       costs.push(0);
       continue;
     }
 
     const before: number = getPendingCost(tool);
-    tool.doTool(tiles[i].x, tiles[i].y, city.blockMaps);
+    tool.doTool(tiles[index].x, tiles[index].y, city.blockMaps);
 
     if (tool.result !== tool.TOOLRESULT_OK) {
       tool.clear();
-      return { costs: costs, failedAt: i };
+      return { costs: costs, failedAt: index };
     }
 
     costs.push(getPendingCost(tool) - before);
@@ -615,10 +615,10 @@ function planRoute(city: SimulationLike, toolName: string, from: Position,
         continue;
       }
 
-      for (let i: number = 0; i < tiles.length; i++) {
-        if (laid.costs[i] !== tiles[i].cost) {
+      for (let index: number = 0; index < tiles.length; index++) {
+        if (laid.costs[index] !== tiles[index].cost) {
           throw new Error('Route cost differs from the engine at ' +
-            tiles[i].x + ', ' + tiles[i].y);
+            tiles[index].x + ', ' + tiles[index].y);
         }
       }
 
@@ -638,9 +638,10 @@ function planRoute(city: SimulationLike, toolName: string, from: Position,
   return failedPlan(toolName, 'no-route');
 }
 
-function sameNumbers(a: number[], b: number[]): boolean {
-  return a.length === b.length &&
-    a.every((value: number, i: number): boolean => value === b[i]);
+function sameNumbers(first: number[], second: number[]): boolean {
+  return first.length === second.length &&
+    first.every((value: number, index: number): boolean =>
+      value === second[index]);
 }
 
 /* Builds a plan from planRoute, all or nothing. A plan whose tiles changed

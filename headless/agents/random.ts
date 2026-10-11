@@ -186,13 +186,14 @@ function createRandomAgent(options: RandomAgentOptions): Agent {
       const actions: GameAction[] = [];
       let funds: number = view.state.funds;
       const starts: Map<string, Position[]> = new Map();
-      const startsFor = (tool: string): Position[] => {
-        if (!starts.has(tool)) {
-          starts.set(tool, routeStarts(view.map, tool));
-        }
+      const startsFor: (tool: string) => Position[] =
+        (tool: string): Position[] => {
+          if (!starts.has(tool)) {
+            starts.set(tool, routeStarts(view.map, tool));
+          }
 
-        return starts.get(tool) as Position[];
-      };
+          return starts.get(tool) as Position[];
+        };
       const turn: TurnReport = {
         slots: rng.int(view.maxActions + 1),
         nothing: 0,

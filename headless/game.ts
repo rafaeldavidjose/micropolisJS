@@ -105,22 +105,26 @@ function quoteAction(city: SimulationLike, action: unknown): ActionResult {
     return fail('unknown-action');
   }
 
-  const a: GameAction = action as GameAction;
+  const gameAction: GameAction = action as GameAction;
 
-  switch (a.type) {
+  switch (gameAction.type) {
     case 'build':
-      return quoteBuild(city, a.tool, a.x, a.y);
+      return quoteBuild(city, gameAction.tool, gameAction.x, gameAction.y);
     case 'route':
-      return quoteRoute(city, a.tool, a.from, a.to);
+      return quoteRoute(city, gameAction.tool, gameAction.from, gameAction.to);
     case 'bulldoze':
-      return quoteBulldoze(city, a.x, a.y);
+      return quoteBulldoze(city, gameAction.x, gameAction.y);
     case 'setTaxRate':
-      return quoteSetTaxRate(city, a.rate);
+      return quoteSetTaxRate(city, gameAction.rate);
     case 'setBudgetPercentages':
       return quoteSetBudgetPercentages(city,
-        { road: a.road, fire: a.fire, police: a.police });
+        {
+          road: gameAction.road,
+          fire: gameAction.fire,
+          police: gameAction.police,
+        });
     case 'setAutoBudget':
-      return quoteSetAutoBudget(city, a.enabled);
+      return quoteSetAutoBudget(city, gameAction.enabled);
     default:
       return fail('unknown-action');
   }
@@ -131,28 +135,33 @@ function applyAction(city: SimulationLike, action: unknown): ActionResult {
     return fail('unknown-action');
   }
 
-  const a: GameAction = action as GameAction;
+  const gameAction: GameAction = action as GameAction;
 
-  switch (a.type) {
+  switch (gameAction.type) {
     case 'build':
-      return build(city, a.tool, a.x, a.y);
+      return build(city, gameAction.tool, gameAction.x, gameAction.y);
     case 'route': {
-      if (!isPosition(a.from) || !isPosition(a.to)) {
+      if (!isPosition(gameAction.from) || !isPosition(gameAction.to)) {
         return fail('invalid-position');
       }
 
-      const plan: RoutePlan = planRoute(city, a.tool, a.from, a.to);
+      const plan: RoutePlan = planRoute(city, gameAction.tool,
+        gameAction.from, gameAction.to);
       return buildRoute(city, plan);
     }
     case 'bulldoze':
-      return bulldoze(city, a.x, a.y);
+      return bulldoze(city, gameAction.x, gameAction.y);
     case 'setTaxRate':
-      return setTaxRate(city, a.rate);
+      return setTaxRate(city, gameAction.rate);
     case 'setBudgetPercentages':
       return setBudgetPercentages(city,
-        { road: a.road, fire: a.fire, police: a.police });
+        {
+          road: gameAction.road,
+          fire: gameAction.fire,
+          police: gameAction.police,
+        });
     case 'setAutoBudget':
-      return setAutoBudget(city, a.enabled);
+      return setAutoBudget(city, gameAction.enabled);
     default:
       return fail('unknown-action');
   }
@@ -162,14 +171,16 @@ function applyAction(city: SimulationLike, action: unknown): ActionResult {
  * replay can draw it. A route that failed for lack of money keeps the
  * tiles it would have taken. */
 function playAction(city: SimulationLike, action: unknown): AppliedAction {
-  const a: GameAction = action as GameAction;
+  const gameAction: GameAction = action as GameAction;
 
-  if (typeof action !== 'object' || action === null || a.type !== 'route' ||
-      !isPosition(a.from) || !isPosition(a.to)) {
+  if (typeof action !== 'object' || action === null ||
+      gameAction.type !== 'route' || !isPosition(gameAction.from) ||
+      !isPosition(gameAction.to)) {
     return { action: action, result: applyAction(city, action) };
   }
 
-  const plan: RoutePlan = planRoute(city, a.tool, a.from, a.to);
+  const plan: RoutePlan = planRoute(city, gameAction.tool, gameAction.from,
+    gameAction.to);
   const result: ActionResult = buildRoute(city, plan);
 
   if (!plan.success) {
@@ -201,9 +212,9 @@ function readTiles(map: MapLike): number[] {
 function diffTiles(before: number[], after: number[]): [number, number][] {
   const changes: [number, number][] = [];
 
-  for (let i: number = 0; i < after.length; i++) {
-    if (after[i] !== before[i]) {
-      changes.push([i, after[i]]);
+  for (let index: number = 0; index < after.length; index++) {
+    if (after[index] !== before[index]) {
+      changes.push([index, after[index]]);
     }
   }
 

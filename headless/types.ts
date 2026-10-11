@@ -318,6 +318,14 @@ type SpriteRecord = [number, number, number, number];
  * samplesPerTurn. Only samples with at least one sprite are kept. */
 type SpriteSample = [number, SpriteRecord[]];
 
+// What createMapHistory in viewer/replay.js returns
+interface MapHistory {
+  width: number;
+  height: number;
+  count: number;
+  tilesAt(position: number, target?: Uint16Array): Uint16Array;
+}
+
 // Map tiles are raw values, with the flag bits of src/tileFlags.ts
 interface RunLog {
   version: number;
@@ -381,6 +389,7 @@ export type {
   CreateCityOptions,
   GameAction,
   GameOptions,
+  MapHistory,
   MapLike,
   MapView,
   Position,

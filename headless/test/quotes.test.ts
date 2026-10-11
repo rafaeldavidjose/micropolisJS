@@ -22,6 +22,7 @@ import { Random } from '../../src/random.ts';
 import { DIRT, WOODS_HIGH, WOODS_LOW } from '../../src/tileValues.ts';
 import type {
   ActionResult,
+  BudgetPercentages,
   MapLike,
   Position,
   SimulationLike,
@@ -39,9 +40,9 @@ function makeRandom(seed: number): () => number {
 
   return (): number => {
     state = (state + 0x6D2B79F5) | 0;
-    let t: number = Math.imul(state ^ (state >>> 15), 1 | state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    let mixed: number = Math.imul(state ^ (state >>> 15), 1 | state);
+    mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
   };
 }
 
@@ -115,12 +116,13 @@ test('quotes: a park and a bulldozed zone cost what was quoted', () => {
 test('quotes: random builds and bulldozing cost what was quoted', () => {
   const city: SimulationLike = createDevelopedCity(SEED);
   const random: () => number = makeRandom(SEED);
-  const pick = (n: number): number => Math.floor(random() * n);
+  const pick: (limit: number) => number = (limit: number): number =>
+    Math.floor(random() * limit);
   const seen: Record<string, number> = {};
 
-  for (let i: number = 0; i < 1500; i++) {
+  for (let draw: number = 0; draw < 1500; draw++) {
     // Changing the funds now and then gives some insufficient-funds cases
-    if (i % 300 === 0) {
+    if (draw % 300 === 0) {
       city.budget.setFunds(pick(4000));
     }
 
@@ -153,7 +155,9 @@ test('quotes: settings cost nothing and match the actions', () => {
   }
 
   for (const road of [0, 50, 100, 101]) {
-    const percentages = { road: road, fire: 50, police: 50 };
+    const percentages: BudgetPercentages = {
+      road: road, fire: 50, police: 50,
+    };
     assertSame(quoteSetBudgetPercentages(city, percentages),
       setBudgetPercentages(city, percentages));
   }
@@ -172,7 +176,8 @@ test('quotes: quoting changes nothing and draws no random numbers', () => {
   const bare: Position = findTile(map,
     (raw: number): boolean => raw === DIRT, true);
   const random: () => number = makeRandom(SEED);
-  const pick = (n: number): number => Math.floor(random() * n);
+  const pick: (limit: number) => number = (limit: number): number =>
+    Math.floor(random() * limit);
   const hashBefore: string = hashCity(quoted);
 
   quoteBuild(quoted, 'park', bare.x, bare.y);
@@ -181,7 +186,7 @@ test('quotes: quoting changes nothing and draws no random numbers', () => {
     quoteBulldoze(quoted, x, ZONE_ROW_Y[0]);
   }
 
-  for (let i: number = 0; i < 500; i++) {
+  for (let draw: number = 0; draw < 500; draw++) {
     quoteBuild(quoted, BUILD_TOOLS[pick(BUILD_TOOLS.length)], pick(120),
       pick(100));
     quoteBulldoze(quoted, pick(120), pick(100));

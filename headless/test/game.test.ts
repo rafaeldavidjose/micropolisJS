@@ -19,6 +19,7 @@ import type {
   AppliedAction,
   CityView,
   GameAction,
+  GameOptions,
   MapLike,
   RunLog,
   SimulationLike,
@@ -178,7 +179,8 @@ test('game: the map changes in the log add up to the final map',
 });
 
 test('game: the same agent and options give the same log', async () => {
-  const options = { seed: SEED, turns: 4, maxActionsPerTurn: 20 };
+  const options: Partial<GameOptions> & { seed: number } =
+    { seed: SEED, turns: 4, maxActionsPerTurn: 20 };
   const first: RunLog = await runGame(scriptedAgent(FIRST_TURN), options);
   const second: RunLog = await runGame(scriptedAgent(FIRST_TURN), options);
 
@@ -191,7 +193,8 @@ test('game: an agent can answer with a promise', async () => {
     decide: async (view: CityView): Promise<GameAction[]> =>
       view.turn === 0 ? FIRST_TURN : [],
   };
-  const options = { seed: SEED, turns: 3, maxActionsPerTurn: 20 };
+  const options: Partial<GameOptions> & { seed: number } =
+    { seed: SEED, turns: 3, maxActionsPerTurn: 20 };
 
   assert.deepEqual(await runGame(waiting, options),
     await runGame(scriptedAgent(FIRST_TURN), options));
@@ -210,7 +213,7 @@ test('game: the log is written as JSON', async () => {
  * the second turn. Reading the sprites must not change the run, so the
  * city, the states and the game's next random number are the same. */
 test('game: recording sprites does not change the run', async () => {
-  const options = {
+  const options: Partial<GameOptions> & { seed: number } = {
     seed: 5, level: Simulation.LEVEL_HARD, disasters: true, turns: 6,
   };
   const recorded: RunLog = await runGame(createDemoAgent(), options);
@@ -240,7 +243,7 @@ test('game: recording sprites does not change the run', async () => {
  * its coal plant runs, the plant and the zones next to it have power. */
 test('game: the view lists every zone with its power', async () => {
   const seen: ZoneView[][] = [];
-  const watched = (inner: Agent): Agent => ({
+  const watched: (inner: Agent) => Agent = (inner: Agent): Agent => ({
     name: inner.name,
     decide: (view: CityView): GameAction[] | Promise<GameAction[]> => {
       seen.push(view.zones);

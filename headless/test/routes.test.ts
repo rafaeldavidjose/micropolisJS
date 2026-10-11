@@ -53,18 +53,19 @@ function makeRandom(seed: number): () => number {
 
   return (): number => {
     state = (state + 0x6D2B79F5) | 0;
-    let t: number = Math.imul(state ^ (state >>> 15), 1 | state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    let mixed: number = Math.imul(state ^ (state >>> 15), 1 | state);
+    mixed = (mixed + Math.imul(mixed ^ (mixed >>> 7), 61 | mixed)) ^ mixed;
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
   };
 }
 
 function randomRequests(count: number, seed: number): RouteRequest[] {
   const random: () => number = makeRandom(seed);
-  const pick = (n: number): number => Math.floor(random() * n);
+  const pick: (limit: number) => number = (limit: number): number =>
+    Math.floor(random() * limit);
   const requests: RouteRequest[] = [];
 
-  for (let i: number = 0; i < count; i++) {
+  for (let index: number = 0; index < count; index++) {
     requests.push({
       tool: ROUTE_TOOLS[pick(ROUTE_TOOLS.length)],
       from: { x: pick(120), y: pick(100) },

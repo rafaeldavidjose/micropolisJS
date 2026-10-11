@@ -390,7 +390,7 @@ function connectZone(view: CityView, plan: TurnPlan, network: Set<number>,
     (zone: ZoneView): boolean => !zone.powered && !isPowerPlant(zone.tile) &&
       !network.has(zoneIndex(map, zone)) &&
       !plan.wired.has(zoneIndex(map, zone)));
-  const isKept = (tile: Position): boolean =>
+  const isKept: (tile: Position) => boolean = (tile: Position): boolean =>
     plan.taken.has(indexOf(map, tile.x, tile.y)) ||
     plan.roadEnds.has(indexOf(map, tile.x, tile.y));
   const openJoins: Position[] = joins.filter((tile: Position): boolean =>

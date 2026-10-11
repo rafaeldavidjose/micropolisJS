@@ -4,7 +4,7 @@
  * The page and the log come from a small server on this computer only. */
 
 import { createServer } from 'node:http';
-import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { existsSync, readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
@@ -82,7 +82,7 @@ function answer(request: IncomingMessage, response: ServerResponse): void {
   response.end(readFileSync(file[0]));
 }
 
-const server = createServer(answer);
+const server: Server = createServer(answer);
 
 server.listen(Number(values.port), '127.0.0.1', () => {
   const port: number = (server.address() as AddressInfo).port;

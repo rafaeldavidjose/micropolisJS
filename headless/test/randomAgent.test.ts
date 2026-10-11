@@ -17,6 +17,7 @@ import type {
   CityView,
   GameAction,
   GameOptions,
+  MapHistory,
   MapView,
   Position,
   RunLog,
@@ -178,7 +179,7 @@ test('random agent: every route it plays starts on a valid tile', async () => {
     weights: { route: 3, building: 2, bulldoze: 0, tax: 0, budget: 0,
       autoBudget: 0, nothing: 0 },
   }), { ...OPTIONS, turns: 24 });
-  const history = createMapHistory(log);
+  const history: MapHistory = createMapHistory(log);
   let checked: number = 0;
 
   for (const turn of log.turns) {

@@ -17,10 +17,18 @@ import {
 import { FLAGS, TILES, describeTile } from '../viewer/tiles.js';
 import * as TileValues from '../../src/tileValues.ts';
 import * as TileFlags from '../../src/tileFlags.ts';
-import type { MapLike, RunLog, SimulationLike } from '../types.ts';
+import type {
+  ActionResult,
+  MapHistory,
+  MapLike,
+  RunLog,
+  SimulationLike,
+  SpriteRecord,
+  TurnLog,
+} from '../types.ts';
 
 const SEED: number = 20260926;
-const OK = { success: true, cost: 0, reason: null };
+const OK: ActionResult = { success: true, cost: 0, reason: null };
 
 function readTiles(map: MapLike): number[] {
   const tiles: number[] = [];
@@ -61,11 +69,12 @@ test('replay: the map rebuilt for every turn matches the city', async () => {
   assert.equal(hashCity(city), log.final.hash);
   assert.ok(log.final.state.population > 2000);
 
-  const history = createMapHistory(log);
+  const history: MapHistory = createMapHistory(log);
   const count: number = positionCount(log);
 
-  for (let i: number = 0; i < count; i++) {
-    const position: number = i % 2 === 0 ? count - 1 - i / 2 : (i - 1) / 2;
+  for (let index: number = 0; index < count; index++) {
+    const position: number = index % 2 === 0 ? count - 1 - index / 2 :
+      (index - 1) / 2;
     assert.deepEqual(Array.from(history.tilesAt(position)), real[position],
       'position ' + position);
   }
@@ -122,9 +131,11 @@ test('replay: buildings sit on their centre tile, routes on their tiles',
 /* A turn's sprites are sampled while the city runs after the actions, so
  * the start of a turn shows the last sample of the turn before. */
 test('replay: sprites at rest, inside a turn and in old logs', () => {
-  const tornado = [6, 2, 100, 60];
-  const train = [1, 3, 300, 200];
-  const log = {
+  const tornado: SpriteRecord = [6, 2, 100, 60];
+  const train: SpriteRecord = [1, 3, 300, 200];
+  const log: Pick<RunLog, 'spriteSampling'> & {
+    turns: Pick<TurnLog, 'sprites'>[];
+  } = {
     spriteSampling: { ticksPerSample: 4, samplesPerTurn: 48 },
     turns: [
       { sprites: [[10, [tornado]], [48, [tornado, train]]] },
