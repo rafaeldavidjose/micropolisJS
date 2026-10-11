@@ -28,7 +28,7 @@ directly.
 npm run test:headless   # all headless tests (node:test)
 npm run bench:headless  # times 20 in-game years
 npm run play:headless -- --agent random --seed 3 --level hard --disasters on --out run.json
-npm run replay -- run.json  # opens the replay viewer on a run log
+npm run replay -- runs/run.json  # opens the replay viewer on a run log
 ```
 
 `play:headless` plays one game and writes its run log. The options are
@@ -36,7 +36,10 @@ npm run replay -- run.json  # opens the replay viewer on a run log
 (the city seed if left out), `--level` (`easy`, `medium` or `hard`),
 `--disasters` (`on` or `off`), `--turns`, `--months` for the months per
 turn, `--max-actions` and `--out`. Left out, they take the defaults of
-`runGame`. It prints the final population and funds when it is done.
+`runGame`. A bare file name for `--out`, like the default `run.json`,
+goes into `runs/` at the root of the repository, which git ignores. A
+path with a folder is used as it is. It prints the final population and
+funds, and where the log went, when it is done.
 
 The tests use `node:test` because the project's Jest setup only covers
 `src/` and `test/`. `npm test` still runs the engine's own Jest tests.
@@ -401,7 +404,7 @@ site fits, and the town never gets power.
 ## Replay viewer
 
 ```sh
-npm run replay -- run.json  # a log from play:headless or writeRunLog
+npm run replay -- runs/run.json  # a log from play:headless or writeRunLog
 npm run replay              # plays a game with the demo agent and shows it
 ```
 

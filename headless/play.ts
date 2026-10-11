@@ -1,7 +1,11 @@
 /* Plays one game from the command line and writes the run log, e.g.
  * npm run play:headless -- --agent random --seed 3 --level hard
- *   --disasters on --turns 80 --out run.json */
+ *   --disasters on --turns 80 --out run.json
+ * A bare file name for --out goes into runs/, which git ignores. */
 
+import { mkdirSync } from 'node:fs';
+import { basename, dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { DEFAULT_OPTIONS, allBudgetWindows, runGame, writeRunLog }
   from './game.ts';
@@ -10,6 +14,9 @@ import { createDemoAgent } from './agents/demo.ts';
 import { passiveAgent } from './agents/passive.ts';
 import { createRandomAgent } from './agents/random.ts';
 import type { Agent, RunLog, TurnLog } from './types.ts';
+
+const RUNS: string = join(dirname(fileURLToPath(import.meta.url)), '..',
+  'runs');
 
 const LEVELS: Record<string, number> = {
   easy: Simulation.LEVEL_EASY,
@@ -80,7 +87,11 @@ const log: RunLog = await runGame(
       values['max-actions'] as string),
   });
 
-writeRunLog(values.out as string, log);
+const out: string = values.out as string;
+const path: string = basename(out) === out ? join(RUNS, out) : out;
+
+mkdirSync(dirname(path), { recursive: true });
+writeRunLog(path, log);
 
 const windowYears: Set<number> = new Set(allBudgetWindows(log).map(
   (window: { date: { year: number } }): number => window.date.year));
@@ -92,4 +103,4 @@ console.log(`${log.agent.name} on seed ${seed}: ` +
   `population ${log.final.state.population}, ` +
   `funds ${log.final.state.funds}, ` +
   `${applied} actions, budget windows in ${windowYears.size} years. ` +
-  `Log in ${values.out}`);
+  `Log in ${relative(process.cwd(), path)}`);
