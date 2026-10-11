@@ -423,6 +423,32 @@ function connectZone(view: CityView, plan: TurnPlan, network: Set<number>,
   return null;
 }
 
+/* Rule 3: zones the network reaches still have no power, so its plants
+ * cannot feed them all. Another coal plant goes next to the network,
+ * before any growth, since new zones would only share the same power. */
+function buildExtraPlant(view: CityView, plan: TurnPlan,
+    network: Set<number>, centre: Position): Choice | null {
+  const map: MapView = view.map;
+  const starved: boolean = view.zones.some((zone: ZoneView): boolean =>
+    !zone.powered && !isPowerPlant(zone.tile) &&
+    network.has(zoneIndex(map, zone)));
+
+  if (plan.plantBuilt || !starved) {
+    return null;
+  }
+
+  const centres: Position[] = [];
+
+  for (const index of network) {
+    const tile: Position = { x: index % map.width,
+      y: Math.floor(index / map.width) };
+    centres.push(...centresTouching(tile, PLANT_SIZE));
+  }
+
+  return buildNear(view, plan, 3, 'coal', PLANT_SIZE,
+    uniqueTiles(map, centres), centre);
+}
+
 // The zone with the highest positive demand, residential first on a tie
 function demandedZone(state: CityState): ZoneTool | null {
   let best: ZoneTool | null = null;
@@ -451,7 +477,7 @@ function zoneNextToRoad(view: CityView, plan: TurnPlan, tool: ZoneTool,
     }
   }
 
-  return buildNear(view, plan, 3, tool, ZONE_SIZE, uniqueTiles(map, centres),
+  return buildNear(view, plan, 4, tool, ZONE_SIZE, uniqueTiles(map, centres),
     centre);
 }
 
@@ -503,7 +529,7 @@ function extendRoad(view: CityView, plan: TurnPlan,
       if (!isPassable(view, plan, next) || !isOpenLand(view, plan, to)) {
         continue;
       }
-      const choice: Choice | null = routeChoice(view, plan, 3, 'road', from,
+      const choice: Choice | null = routeChoice(view, plan, 4, 'road', from,
         to);
 
       if (plan.outOfMoney || choice !== null) {
@@ -515,7 +541,7 @@ function extendRoad(view: CityView, plan: TurnPlan,
   return null;
 }
 
-/* Rule 3: the zone with the highest positive demand, on the free site next
+/* Rule 4: the zone with the highest positive demand, on the free site next
  * to a road closest to the city centre, or a new road when there is none. */
 function grow(view: CityView, plan: TurnPlan,
     centre: Position): Choice | null {
@@ -532,31 +558,6 @@ function grow(view: CityView, plan: TurnPlan,
   }
 
   return extendRoad(view, plan, centre);
-}
-
-/* Rule 4: zones the network reaches still have no power, so its plants
- * cannot feed them all. Another coal plant goes next to the network. */
-function buildExtraPlant(view: CityView, plan: TurnPlan,
-    network: Set<number>, centre: Position): Choice | null {
-  const map: MapView = view.map;
-  const starved: boolean = view.zones.some((zone: ZoneView): boolean =>
-    !zone.powered && !isPowerPlant(zone.tile) &&
-    network.has(zoneIndex(map, zone)));
-
-  if (plan.plantBuilt || !starved) {
-    return null;
-  }
-
-  const centres: Position[] = [];
-
-  for (const index of network) {
-    const tile: Position = { x: index % map.width,
-      y: Math.floor(index / map.width) };
-    centres.push(...centresTouching(tile, PLANT_SIZE));
-  }
-
-  return buildNear(view, plan, 4, 'coal', PLANT_SIZE,
-    uniqueTiles(map, centres), centre);
 }
 
 function commit(view: CityView, plan: TurnPlan, choice: Choice): void {
@@ -583,8 +584,8 @@ function commit(view: CityView, plan: TurnPlan, choice: Choice): void {
 
 /* A greedy baseline. Each turn, up to the action limit and while the money
  * lasts, it plays the first of four rules that fits, then checks them
- * again: a first power plant, power for an unconnected zone, a zone for
- * the highest demand, and another plant when the network is overloaded.
+ * again: a first power plant, power for an unconnected zone, another plant
+ * when the network is overloaded, and a zone for the highest demand.
  * It ignores crime, fire, pollution, taxes and the budget, and draws no
  * random numbers. Routes only get their two ends from it, the route
  * itself comes from planRoute. */
@@ -613,8 +614,8 @@ function createGreedyAgent(): Agent {
       const rules: (() => Choice | null)[] = [
         (): Choice | null => buildFirstPlant(view, plan),
         (): Choice | null => connectZone(view, plan, network, joins, centre),
-        (): Choice | null => grow(view, plan, centre),
         (): Choice | null => buildExtraPlant(view, plan, network, centre),
+        (): Choice | null => grow(view, plan, centre),
       ];
 
       while (plan.actions.length < view.maxActions && !plan.outOfMoney) {

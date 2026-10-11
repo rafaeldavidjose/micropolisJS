@@ -417,11 +417,16 @@ these rules that fits, then checks them again:
    to the centre of the map.
 2. When a zone has no power and the power network does not reach it, it
    lays a power line to the one closest to the city centre.
-3. Otherwise it builds the zone type with the highest positive demand on
+3. When zones the network reaches still have no power, the plants cannot
+   feed them all, and it builds another coal plant next to the network.
+4. Otherwise it builds the zone type with the highest positive demand on
    the free site next to a road closest to the city centre. With no such
    site, it extends a road.
-4. When zones the network reaches still have no power, the plants cannot
-   feed them all, and it builds another coal plant next to the network.
+
+The overloaded plant comes before growth, since new zones on a network
+that is already short of power would only share the same power. With
+growth first, the bigger towns ended the game with up to half of their
+zones without power.
 
 It ignores crime, fire, pollution, taxes and the budget, and never
 changes the tax rate or the budget settings. It quotes every action and
@@ -442,7 +447,7 @@ and zones and buildings. That is the path of the power scan, without
 its limit on how many tiles a plant feeds. Rule 2 runs the line from the
 point of the network closest to the zone, which is one of its power
 lines or free land next to it, to the tile next to the zone closest to
-that point. Rule 4 is what is left for zones the network does reach.
+that point. Rule 3 is what is left for zones the network does reach.
 
 A new road starts on the road tile closest to the city centre that has
 free land next to it, or on the free tile closest to the centre while
