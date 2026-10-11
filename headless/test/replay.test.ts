@@ -11,6 +11,8 @@ import {
   actionShape,
   createMapHistory,
   positionCount,
+  spriteAt,
+  spritesAt,
 } from '../viewer/replay.js';
 import { FLAGS, TILES, describeTile } from '../viewer/tiles.js';
 import * as TileValues from '../../src/tileValues.ts';
@@ -115,4 +117,32 @@ test('replay: buildings sit on their centre tile, routes on their tiles',
     action: { type: 'setTaxRate', rate: 9 }, result: OK,
   }), null);
   assert.equal(actionShape({ action: null, result: OK }), null);
+});
+
+/* A turn's sprites are sampled while the city runs after the actions, so
+ * the start of a turn shows the last sample of the turn before. */
+test('replay: sprites at rest, inside a turn and in old logs', () => {
+  const tornado = [6, 2, 100, 60];
+  const train = [1, 3, 300, 200];
+  const log = {
+    spriteSampling: { ticksPerSample: 4, samplesPerTurn: 48 },
+    turns: [
+      { sprites: [[10, [tornado]], [48, [tornado, train]]] },
+      { sprites: [[1, [train]]] },
+    ],
+  };
+
+  assert.deepEqual(spritesAt(log, 0), []);
+  assert.deepEqual(spritesAt(log, 1), [tornado, train]);
+  assert.deepEqual(spritesAt(log, 2), []);
+  assert.deepEqual(spritesAt(log, 0, 10), [tornado]);
+  assert.deepEqual(spritesAt(log, 0, 11), []);
+  assert.deepEqual(spritesAt(log, 1, 1), [train]);
+  assert.deepEqual(spritesAt({ turns: [{}, {}] }, 1), []);
+
+  // A tornado is 48 pixels square and a train 32
+  assert.deepEqual(spriteAt([tornado, train], 147, 107), tornado);
+  assert.equal(spriteAt([tornado, train], 148, 60), null);
+  assert.deepEqual(spriteAt([tornado, train], 331, 231), train);
+  assert.equal(spriteAt([tornado, train], 332, 200), null);
 });

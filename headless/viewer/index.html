@@ -46,6 +46,8 @@
                 title="Show the map at the end of the turn">After turn</button>
         <button id="power" class="tool toggle" type="button" aria-pressed="true"
                 title="Mark zones without power with a lightning bolt">Unpowered</button>
+        <button id="sprites" class="tool toggle" type="button" aria-pressed="true"
+                title="Show trains, helicopters, planes, ships, monsters, tornadoes and explosions">Sprites</button>
         <span id="viewport-turn" class="viewport-turn"></span>
       </div>
       <div class="stage">
@@ -58,7 +60,6 @@
       <footer class="statusbar">
         <span id="hover" class="readout">Point at a tile to see what it is</span>
         <span id="zoom" class="zoom" title="Zoom, 100% is one screen pixel per tile pixel"></span>
-        <span class="sprites" title="Tornadoes, monsters, planes, helicopters, ships and trains are sprites. Sprites are not in the log, so they are not shown.">No sprites in the log</span>
       </footer>
     </section>
 
@@ -103,11 +104,6 @@
           <summary>Agent report</summary>
           <dl id="report" class="kv"></dl>
         </details>
-        <p class="note">
-          Sprites (tornadoes, monsters, planes, helicopters, ships and trains)
-          are not in the log, so they are not shown. Their damage is in the
-          tiles.
-        </p>
       </section>
     </aside>
 

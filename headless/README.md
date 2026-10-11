@@ -313,9 +313,10 @@ The run log has the options, the agent's name and settings, the map at
 the start, one entry per turn and the final state with the city hash.
 Each turn has the date and the state the agent saw, the map changes since
 the turn before, the actions with their results, the number of dropped
-actions, the budget windows answered while the city ran, and the agent's
-report. A route action also has `tiles`, the `[x, y]` tiles of its plan.
-A route that failed for lack of money keeps them too.
+actions, the budget windows answered while the city ran, the sprites
+seen while it ran, and the agent's report. A route action also has
+`tiles`, the `[x, y]` tiles of its plan. A route that failed for lack of
+money keeps them too.
 
 The map is stored row by row as raw tile values, with the flag bits of
 `src/tileFlags.ts`, for example power and zone centre. Every turn stores
@@ -325,8 +326,25 @@ any turn. The agent's view gives the tile number without the flags, like
 passive agent and 95 to 120 kB for the random and the demo agent.
 `recordMap: false` leaves the map out.
 
-The log has a `version`, now 2. Version 1 logs had tile numbers without
-the flags and no route tiles.
+Sprites are trains, helicopters, planes, ships, monsters, tornadoes and
+explosions. While the city runs through a turn, the log reads the sprite
+list every 4 ticks, so 48 times in a turn of 3 months. A sample is
+`[n, sprites]`, where `n` counts the samples from 1 at 4 ticks into the
+turn, and every sprite is `[type, frame, left, top]`: the type from
+`src/spriteConstants.ts`, the frame, and the top left corner of its image
+in map pixels, as the browser draws it. Only samples with a sprite are
+kept, and `spriteSampling` at the top of the log has the rate. Sprites
+move 3 times per tick, about 2 pixels a move for a tornado and 4 for a
+train. With a sample every time unit (16 ticks) a tornado would jump 6
+tiles between samples and a train 12. Every 4 ticks they move about 1.5
+and 3 tiles. A tornado is often there for several turns, until it leaves
+the map. The sprites add 0 to 6 kB to a 20 year demo game with disasters
+on. Reading the list draws no random number, so recording does not change
+the run, which a test checks. `recordSprites: false` leaves them out.
+
+The log has a `version`, now 3. Version 2 logs had no sprites, and
+version 1 logs also had tile numbers without the flags and no route
+tiles.
 
 `agents/passive.ts` has the passive agent, which does nothing.
 
@@ -418,7 +436,8 @@ browsers do not load its JavaScript modules from a `file://` address.
 
 The layout follows a debugger or a profiler more than a web page. The map
 takes the middle and most of the screen. Its toolbar has Fit, zoom out
-and zoom in, After turn and Unpowered, and the turn on the right. Below
+and zoom in, After turn, Unpowered and Sprites, and the turn on the
+right. Below
 the map a status bar says what the tile under the pointer is, or the
 last tapped one, with the zoom. The actions of the turn are on the left
 and the inspector on the right. On a wide screen the Actions and
@@ -468,9 +487,14 @@ kind comes from the tile ranges of the query tool (`classifyZone` in
 like shore, bridge, traffic, empty zone, hospital or church, and the
 flags add the zone centre and the power.
 
-Tornadoes, monsters, planes, helicopters, ships and trains are sprites,
-and sprites are not in the log. The viewer cannot show them and says so
-in the status bar and the inspector. The damage they do is in the tiles.
+The sprites are drawn with `images/sprites.png`, the sprite sheet of the
+browser game, at the frame and place the log has. Stepping shows the
+sprites at the start of the turn, which are the last sample of the turn
+before, or at its end with After turn. Play goes through the samples
+inside each turn, so a tornado or a train moves across the map of that
+turn. The map itself only changes at the next turn, so the damage a
+tornado does shows up then. Hovering a sprite names it in the status
+bar, and the Sprites toggle hides them.
 
 `viewer/replay.js` rebuilds the map of a turn from the first map and the
 changes. It keeps a full copy every 16 turns, so a jump replays at most
@@ -483,8 +507,9 @@ the viewer needs from `src/tileValues.ts` and `src/tileFlags.ts` are
 copied into `viewer/tiles.js`, because the browser cannot load the
 TypeScript files. The test checks them against the engine.
 
-Version 1 logs open too. They have no flags, so no power is shown, and
-their routes are straight lines between the ends.
+Older logs open too. Version 2 logs have no sprites. Version 1 logs
+also have no flags, so no power is shown, and their routes are straight
+lines between the ends.
 
 ## Budget window
 

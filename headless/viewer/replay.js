@@ -1,6 +1,6 @@
 /* Rebuilds the map of any turn from a run log, and says where each action
- * goes on the map. Plain JavaScript without the DOM, so the viewer and
- * test/replay.test.ts both use it.
+ * goes on the map and which sprites are where. Plain JavaScript without
+ * the DOM, so the viewer and test/replay.test.ts both use it.
  *
  * Position p is the start of turn p, the map the agent saw. The last
  * position, turns.length, is the end of the game. The map of a position is
@@ -40,6 +40,57 @@ const NAMES = {
   rail: 'Rail',
   wire: 'Power line',
 };
+
+/* Sprite types from src/spriteConstants.ts. The browser draws them from
+ * images/sprites.png, a row of 48 pixel cells per type, at the size the
+ * sprite has in its constructor: 32 for trains and helicopters. */
+const SPRITE_NAMES = {
+  1: 'Train',
+  2: 'Helicopter',
+  3: 'Airplane',
+  4: 'Ship',
+  5: 'Monster',
+  6: 'Tornado',
+  7: 'Explosion',
+};
+const SPRITE_CELL = 48;
+
+function spriteSize(type) {
+  return type === 1 || type === 2 ? 32 : SPRITE_CELL;
+}
+
+function spriteName(type) {
+  return SPRITE_NAMES[type] ?? 'Sprite ' + type;
+}
+
+/* The sprites at a position, as [type, frame, left, top]. Without a
+ * sample it is the start of the turn, which is the last sample of the turn
+ * before. With a sample from 1 to samplesPerTurn it is that moment inside
+ * the turn. Logs before version 3 have no sprites. */
+function spritesAt(log, position, sample = null) {
+  if (!log.spriteSampling) {
+    return [];
+  }
+
+  const turn = log.turns[sample === null ? position - 1 : position];
+  const index = sample === null ? log.spriteSampling.samplesPerTurn : sample;
+  const found = turn?.sprites?.find((entry) => entry[0] === index);
+  return found ? found[1] : [];
+}
+
+// The last sprite drawn over a point in map pixels, or null
+function spriteAt(sprites, x, y) {
+  for (let i = sprites.length - 1; i >= 0; i--) {
+    const [type, , left, top] = sprites[i];
+    const size = spriteSize(type);
+
+    if (x >= left && x < left + size && y >= top && y < top + size) {
+      return sprites[i];
+    }
+  }
+
+  return null;
+}
 
 function positionCount(log) {
   return log.turns.length + 1;
@@ -190,10 +241,15 @@ function describeResult(result) {
 
 export {
   SNAPSHOT_INTERVAL,
+  SPRITE_CELL,
   actionShape,
   createMapHistory,
   describeAction,
   describeResult,
   positionCount,
   shapeContains,
+  spriteAt,
+  spriteName,
+  spriteSize,
+  spritesAt,
 };

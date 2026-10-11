@@ -1,10 +1,15 @@
 import {
+  SPRITE_CELL,
   actionShape,
   createMapHistory,
   describeAction,
   describeResult,
   positionCount,
   shapeContains,
+  spriteAt,
+  spriteName,
+  spriteSize,
+  spritesAt,
 } from './replay.js';
 import {
   TILES,
@@ -76,6 +81,15 @@ const sheetLoaded = new Promise((resolve, reject) => {
 });
 sheet.src = 'tiles.png';
 
+// The game's sprite sheet. Without it the map still works, with no sprites
+const spriteSheet = new Image();
+let spritesReady = false;
+spriteSheet.onload = () => {
+  spritesReady = true;
+  render();
+};
+spriteSheet.src = 'sprites.png';
+
 /* A map pixel p is drawn at p * zoom + x on screen, in CSS pixels. While
  * fitted, the map is fitted again when the window changes size. */
 const camera = { zoom: 1, x: 0, y: 0, fitted: true };
@@ -87,9 +101,12 @@ let hover = null;
 let drag = null;
 let scrubbing = false;
 let trackHover = null;
-let timer = null;
+let frameRequest = null;
+let playStart = 0;
+let sample = null;
 let showAfter = false;
 let markPower = true;
+let showSprites = true;
 
 function element(tag, text, className) {
   const node = document.createElement(tag);
@@ -236,6 +253,7 @@ function setPosition(p) {
 
   position = clamp(Math.round(p), 0, run.count - 1);
   selected = -1;
+  sample = null;
   slider.value = String(position);
 
   // An error from a file that did not load stays until the next step
@@ -329,6 +347,7 @@ function render() {
     ratio * camera.x, ratio * camera.y);
   ctx.imageSmoothingEnabled = camera.zoom < 1;
   ctx.drawImage(run.image, 0, 0);
+  drawSprites(currentSprites());
 
   const shapes = currentShapes();
   shapes.forEach(drawShape);
@@ -337,6 +356,29 @@ function render() {
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
   shapes.forEach(drawLabel);
   $('zoom').textContent = Math.round(camera.zoom * 100) + '%';
+}
+
+/* At rest the sprites of the start of the turn, or of its end with After
+ * turn. While playing, the sample of the turn that the time has reached. */
+function currentSprites() {
+  if (!showSprites || run === null) {
+    return [];
+  }
+
+  return sample === null ? spritesAt(run.log, mapPosition()) :
+    spritesAt(run.log, position, sample);
+}
+
+function drawSprites(sprites) {
+  if (!spritesReady) {
+    return;
+  }
+
+  for (const [type, frame, left, top] of sprites) {
+    const size = spriteSize(type);
+    ctx.drawImage(spriteSheet, (frame - 1) * SPRITE_CELL,
+      (type - 1) * SPRITE_CELL, size, size, left, top, size, size);
+  }
 }
 
 function trace(points) {
@@ -486,8 +528,11 @@ function showHover() {
   }
 
   const value = run.tiles[tile.y * run.history.width + tile.x];
-  $('hover').textContent = `${tile.x}, ${tile.y} · ${describeTile(value)} ` +
-    `· tile ${tileIndex(value)}`;
+  const sprite = spriteAt(currentSprites(),
+    (hover.sx - camera.x) / camera.zoom, (hover.sy - camera.y) / camera.zoom);
+  $('hover').textContent = (sprite === null ? '' :
+    spriteName(sprite[0]) + ' over ') +
+    `${tile.x}, ${tile.y} · ${describeTile(value)} · tile ${tileIndex(value)}`;
 }
 
 function fit() {
@@ -935,30 +980,54 @@ function play() {
 
   $('play').setAttribute('aria-pressed', 'true');
   $('play').setAttribute('aria-label', 'Pause');
-  tick();
+  playStart = performance.now();
+  frameRequest = requestAnimationFrame(step);
 }
 
-function tick() {
-  timer = setTimeout(() => {
+/* One frame of play. Each turn takes 1000 / speed milliseconds. Inside a
+ * turn the sprites follow the samples of the turn, so a tornado or a
+ * train moves over the map of the turn. */
+function step(now) {
+  const duration = 1000 / Number($('speed').value);
+
+  if (now - playStart >= duration) {
     if (position >= run.count - 1) {
       stop();
       return;
     }
 
+    playStart = now;
     setPosition(position + 1);
-    tick();
-  }, 1000 / Number($('speed').value));
+  } else if (run.log.spriteSampling && position < run.log.turns.length) {
+    const before = currentSprites();
+    sample = clamp(Math.ceil((now - playStart) / duration *
+      run.log.spriteSampling.samplesPerTurn), 1,
+      run.log.spriteSampling.samplesPerTurn);
+
+    if (before.length > 0 || currentSprites().length > 0) {
+      render();
+      showHover();
+    }
+  }
+
+  frameRequest = requestAnimationFrame(step);
 }
 
 function stop() {
-  clearTimeout(timer);
-  timer = null;
+  cancelAnimationFrame(frameRequest);
+  frameRequest = null;
+  sample = null;
   $('play').setAttribute('aria-pressed', 'false');
   $('play').setAttribute('aria-label', 'Play');
+
+  if (run !== null) {
+    render();
+    showHover();
+  }
 }
 
 function togglePlay() {
-  if (timer === null) {
+  if (frameRequest === null) {
     play();
   } else {
     stop();
@@ -1027,6 +1096,12 @@ onButton('after', (button) => {
   if (run !== null) {
     refreshMap();
   }
+});
+onButton('sprites', (button) => {
+  showSprites = !showSprites;
+  button.setAttribute('aria-pressed', String(showSprites));
+  render();
+  showHover();
 });
 onButton('power', (button) => {
   markPower = !markPower;

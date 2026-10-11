@@ -366,8 +366,7 @@ body.dropping .stage {
   white-space: nowrap;
 }
 
-.zoom,
-.sprites {
+.zoom {
   white-space: nowrap;
 }
 
