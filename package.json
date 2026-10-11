@@ -15,7 +15,7 @@
     "watch": "webpack --watch --mode development",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
-    "test:headless": "tsx --test headless/test/*.ts",
+    "test:headless": "tsx --test --test-concurrency=1 headless/test/*.ts",
     "bench:headless": "tsx headless/bench.ts",
     "play:headless": "tsx headless/play.ts",
     "replay": "tsx headless/replay.ts",
