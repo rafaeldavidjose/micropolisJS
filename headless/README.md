@@ -341,9 +341,21 @@ building or zone (any build tool except road, rail and wire), a route
 (road, rail or wire), bulldozing, the tax rate, the budget percentages,
 auto budget, or nothing. The weights are equal unless `weights` says
 otherwise. Then it draws the parameters, all uniform: a tile anywhere on
-the map, for a route a start tile and an end tile at most
-`maxRouteDistance` apart (Manhattan distance, 20 by default), a tax rate
-from 0 to 20, and percentages from 0 to 100.
+the map for a building or for bulldozing, a tax rate from 0 to 20, and
+percentages from 0 to 100.
+
+A route starts where it can connect to something: on a piece of the same
+kind (road for a road, rail for a rail, a power line for a wire), or on a
+tile next to a zone or building. `routeStarts` lists those tiles, and the
+start is drawn uniformly from the list. While the city has none for that
+tool, as in the first turns, the start can be any tile. The end is any
+tile at most `maxRouteDistance` from the start (Manhattan distance, 20 by
+default), empty land included.
+
+The rule belongs to the random agent only. `planRoute` and the route
+action accept any two tiles for every agent. A road that connects to
+nothing stays a mistake another agent can make, and the experiment can
+count it.
 
 It only plays valid actions. It quotes every draw, or plans it for a
 route, and draws again when the quote fails, up to `maxTries` times (20

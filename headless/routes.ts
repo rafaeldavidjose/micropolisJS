@@ -199,6 +199,12 @@ const RULES: Record<string, ToolRules> = {
 
 const ROUTE_TOOLS: readonly string[] = Object.keys(RULES);
 
+// The tile has a piece of the tool's kind, which a route takes as it is
+function hasPiece(toolName: string, value: number): boolean {
+  const rules: ToolRules | undefined = RULES[toolName];
+  return rules !== undefined && rules.hasKind(normalize(value));
+}
+
 function failedPlan(tool: string, reason: ActionFailure): RoutePlan {
   return {
     success: false,
@@ -682,4 +688,4 @@ function buildRoute(city: SimulationLike, plan: RoutePlan): ActionResult {
   return succeed(fundsBefore - city.budget.totalFunds);
 }
 
-export { ROUTE_TOOLS, planRoute, buildRoute };
+export { ROUTE_TOOLS, hasPiece, planRoute, buildRoute };

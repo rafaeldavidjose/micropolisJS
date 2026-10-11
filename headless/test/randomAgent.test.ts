@@ -3,10 +3,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { runGame } from '../game.ts';
-import { Simulation } from '../runner.ts';
+import { createCity, Simulation } from '../runner.ts';
+import { build } from '../actions.ts';
+import { getMap } from '../engine.ts';
 import { ROUTE_TOOLS } from '../routes.ts';
 import { passiveAgent } from '../agents/passive.ts';
-import { createRandomAgent } from '../agents/random.ts';
+import { createRandomAgent, routeStarts } from '../agents/random.ts';
+import { createMapHistory } from '../viewer/replay.js';
 import { Random } from '../../src/random.ts';
 import type {
   Agent,
@@ -14,7 +17,10 @@ import type {
   CityView,
   GameAction,
   GameOptions,
+  MapView,
+  Position,
   RunLog,
+  SimulationLike,
   TurnLog,
 } from '../types.ts';
 
@@ -123,4 +129,83 @@ test('random agent: it keeps to the limits and the weights', async () => {
   }), OPTIONS);
 
   assert.equal(allActions(idle).length, 0);
+});
+
+function hasTile(tiles: Position[], x: number, y: number): boolean {
+  return tiles.some((tile: Position): boolean => tile.x === x && tile.y === y);
+}
+
+// With this seed the land around 58, 47 is clear, see actions.test.ts
+test('random agent: routes start on their kind or next to a building',
+  () => {
+  const city: SimulationLike = createCity({
+    seed: 20260926, level: Simulation.LEVEL_EASY, disasters: false,
+  });
+
+  assert.equal(routeStarts(getMap(city), 'road').length, 0);
+
+  build(city, 'residential', 58, 47);
+  build(city, 'road', 64, 50);
+  build(city, 'rail', 66, 50);
+  build(city, 'wire', 68, 50);
+
+  const roads: Position[] = routeStarts(getMap(city), 'road');
+  const rails: Position[] = routeStarts(getMap(city), 'rail');
+  const wires: Position[] = routeStarts(getMap(city), 'wire');
+
+  assert.ok(hasTile(roads, 64, 50));
+  assert.ok(!hasTile(roads, 66, 50));
+  assert.ok(hasTile(rails, 66, 50));
+  assert.ok(hasTile(wires, 68, 50));
+
+  // Next to the zone on all four sides, never on it
+  for (const [x, y] of [[56, 47], [60, 47], [58, 45], [58, 49]]) {
+    assert.ok(hasTile(roads, x, y) && hasTile(rails, x, y) &&
+      hasTile(wires, x, y), x + ', ' + y);
+  }
+
+  assert.ok(!hasTile(roads, 58, 47));
+  assert.ok(!hasTile(roads, 57, 46));
+  assert.ok(!hasTile(roads, 56, 45));
+  assert.equal(roads.length, 12 + 1);
+});
+
+/* Every route checked against the map of its turn, rebuilt from the log.
+ * Routes from the first turns, before anything is built, start anywhere. */
+test('random agent: every route it plays starts on a valid tile', async () => {
+  const log: RunLog = await runGame(createRandomAgent({
+    seed: 11,
+    weights: { route: 3, building: 2, bulldoze: 0, tax: 0, budget: 0,
+      autoBudget: 0, nothing: 0 },
+  }), { ...OPTIONS, turns: 24 });
+  const history = createMapHistory(log);
+  let checked: number = 0;
+
+  for (const turn of log.turns) {
+    const tiles: Uint16Array = history.tilesAt(turn.turn);
+    const map: MapView = {
+      width: history.width,
+      height: history.height,
+      getTileValue: (x: number, y: number): number =>
+        tiles[y * history.width + x] & 0x3ff,
+    };
+
+    for (const applied of turn.actions) {
+      const action: GameAction = applied.action as GameAction;
+
+      if (action.type !== 'route') {
+        continue;
+      }
+
+      const starts: Position[] = routeStarts(map, action.tool);
+
+      if (starts.length > 0) {
+        assert.ok(hasTile(starts, action.from.x, action.from.y),
+          'turn ' + turn.turn + ': ' + JSON.stringify(action));
+        checked++;
+      }
+    }
+  }
+
+  assert.ok(checked > 10);
 });

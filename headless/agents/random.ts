@@ -1,5 +1,18 @@
+import {
+  CHURCH7LAST,
+  FOUNTAIN,
+  HBRDG0,
+  HBRDG3,
+  INDBASE2,
+  LIGHTNINGBOLT,
+  RESBASE,
+  TINYEXP,
+  TINYEXPLAST,
+  VBRDG0,
+  VBRDG3,
+} from '../../src/tileValues.ts';
 import { BUILD_TOOLS } from '../actions.ts';
-import { ROUTE_TOOLS } from '../routes.ts';
+import { ROUTE_TOOLS, hasPiece } from '../routes.ts';
 import { makeRng } from '../rng.ts';
 import type { Rng } from '../rng.ts';
 import type {
@@ -7,6 +20,7 @@ import type {
   Agent,
   CityView,
   GameAction,
+  MapView,
   Position,
 } from '../types.ts';
 
@@ -73,6 +87,47 @@ function randomTile(rng: Rng, view: CityView): Position {
   return { x: rng.int(view.map.width), y: rng.int(view.map.height) };
 }
 
+/* A tile of a zone or building. Zones and buildings run from RESBASE to
+ * the last church, with a park fountain, the draw bridges, the lightning
+ * bolt and the explosions in between. */
+function isBuilding(value: number): boolean {
+  return value >= RESBASE && value <= CHURCH7LAST &&
+    value !== LIGHTNINGBOLT &&
+    !(value >= HBRDG0 && value <= HBRDG3) &&
+    !(value >= FOUNTAIN && value < INDBASE2) &&
+    !(value >= TINYEXP && value <= TINYEXPLAST) &&
+    !(value >= VBRDG0 && value <= VBRDG3);
+}
+
+function touchesBuilding(map: MapView, x: number, y: number): boolean {
+  return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]: number[]) => {
+    const nx: number = x + dx;
+    const ny: number = y + dy;
+
+    return nx >= 0 && ny >= 0 && nx < map.width && ny < map.height &&
+      isBuilding(map.getTileValue(nx, ny));
+  });
+}
+
+/* Where a route of this tool may start: on a piece of the same kind, or
+ * next to a zone or building without being part of it. In map order. */
+function routeStarts(map: MapView, tool: string): Position[] {
+  const starts: Position[] = [];
+
+  for (let y: number = 0; y < map.height; y++) {
+    for (let x: number = 0; x < map.width; x++) {
+      const value: number = map.getTileValue(x, y);
+
+      if (hasPiece(tool, value) ||
+          (!isBuilding(value) && touchesBuilding(map, x, y))) {
+        starts.push({ x: x, y: y });
+      }
+    }
+  }
+
+  return starts;
+}
+
 // Uniform over the tiles on the map at most distance away, Manhattan
 function nearbyTile(rng: Rng, view: CityView, from: Position,
     distance: number): Position {
@@ -89,8 +144,11 @@ function nearbyTile(rng: Rng, view: CityView, from: Position,
   }
 }
 
+/* A route starts on a tile from routeStarts, or anywhere while the city
+ * has none for that tool. Its end can be any tile in reach. */
 function drawAction(rng: Rng, view: CityView, category: Category,
-    maxRouteDistance: number): GameAction {
+    maxRouteDistance: number,
+    startsFor: (tool: string) => Position[]): GameAction {
   switch (category) {
     case 'building': {
       const tool: string = BUILDING_TOOLS[rng.int(BUILDING_TOOLS.length)];
@@ -99,7 +157,9 @@ function drawAction(rng: Rng, view: CityView, category: Category,
     }
     case 'route': {
       const tool: string = ROUTE_TOOLS[rng.int(ROUTE_TOOLS.length)];
-      const from: Position = randomTile(rng, view);
+      const starts: Position[] = startsFor(tool);
+      const from: Position = starts.length > 0 ?
+        starts[rng.int(starts.length)] : randomTile(rng, view);
       const to: Position = nearbyTile(rng, view, from, maxRouteDistance);
       return { type: 'route', tool: tool, from: from, to: to };
     }
@@ -125,7 +185,8 @@ function drawAction(rng: Rng, view: CityView, category: Category,
  * Each slot picks a category by weight, then draws the parameters and
  * quotes the action. A failing draw is rejected and drawn again, up to
  * maxTries times. The money its earlier actions of the turn will spend is
- * kept aside, so it does not pick more than the city can pay. */
+ * kept aside, so it does not pick more than the city can pay. The start
+ * tiles of routes are worked out once per turn and tool. */
 function createRandomAgent(options: RandomAgentOptions): Agent {
   const rng: Rng = makeRng(options.seed);
   const weights: Record<Category, number> = {
@@ -148,6 +209,14 @@ function createRandomAgent(options: RandomAgentOptions): Agent {
     decide: (view: CityView): GameAction[] => {
       const actions: GameAction[] = [];
       let funds: number = view.state.funds;
+      const starts: Map<string, Position[]> = new Map();
+      const startsFor = (tool: string): Position[] => {
+        if (!starts.has(tool)) {
+          starts.set(tool, routeStarts(view.map, tool));
+        }
+
+        return starts.get(tool) as Position[];
+      };
       const turn: TurnReport = {
         slots: rng.int(view.maxActions + 1),
         nothing: 0,
@@ -170,7 +239,7 @@ function createRandomAgent(options: RandomAgentOptions): Agent {
         for (let attempt: number = 0; attempt < maxTries && !found;
              attempt++) {
           const action: GameAction = drawAction(rng, view, category,
-            maxRouteDistance);
+            maxRouteDistance, startsFor);
           const quote: ActionResult = view.quote(action);
           const reason: string | null = !quote.success ? quote.reason :
             quote.cost > funds ? 'insufficient-funds' : null;
@@ -199,4 +268,4 @@ function createRandomAgent(options: RandomAgentOptions): Agent {
 }
 
 export type { Category, RandomAgentOptions };
-export { CATEGORIES, createRandomAgent };
+export { CATEGORIES, createRandomAgent, routeStarts };
