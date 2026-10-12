@@ -25,8 +25,9 @@ Run `npm install` once. It installs `tsx`, which runs the TypeScript files
 directly.
 
 ```sh
-npm run test:headless   # all headless tests (node:test)
-npm run bench:headless  # times 20 in-game years
+npm run test:headless # all headless tests (node:test)
+npm run lint # the code style checks
+npm run bench:headless # times 20 in-game years
 npm run play:headless -- --agent random --seed 3 --level hard --disasters on --out run.json
 npm run replay -- runs/run.json  # opens the replay viewer on a run log
 ```
@@ -43,6 +44,11 @@ population and funds, and where the log went, when it is done.
 
 The tests use `node:test` because the project's Jest setup only covers
 `src/` and `test/`. `npm test` still runs the engine's own Jest tests.
+
+`npm run lint` checks the parts of the code style that a tool can check:
+ESLint on `headless/` with `eslint.config.js`, tsc with checkJs on the
+viewer's JavaScript, and `dashes.ts`, which looks for the long dash in
+every file of ours.
 
 ## API
 
