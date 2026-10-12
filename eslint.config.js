@@ -13,7 +13,7 @@ export default defineConfig([
       'id-length': ['error', { min: 2, exceptions: ['x', 'y'] }],
       'id-denylist': ['error', 'tmp', 'temp', 'res', 'ret', 'val', 'obj',
         'arr', 'str', 'num', 'cnt', 'idx', 'len', 'el', 'ev', 'evt', 'err',
-        'cb', 'fn', 'ctx', 'foo', 'bar'],
+        'cb', 'fn', 'ctx'],
       'multiline-comment-style': ['error', 'bare-block'],
       'padding-line-between-statements': ['error',
         { blankLine: 'always', prev: 'function', next: '*' },

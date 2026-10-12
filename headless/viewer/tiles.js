@@ -3,9 +3,12 @@
  * numbers the viewer needs are copied here. test/replay.test.ts checks
  * them against the engine. */
 
+/** @type {number} */
 const TILE_SIZE = 16;
+/** @type {number} */
 const TILES_PER_ROW = 32;
 
+/** @type {Record<string, number>} */
 const FLAGS = {
   POWERBIT: 0x8000,
   CONDBIT: 0x4000,
@@ -16,6 +19,7 @@ const FLAGS = {
   BIT_MASK: 0x03ff,
 };
 
+/** @type {Record<string, number>} */
 const TILES = {
   DIRT: 0,
   RIVER: 2,
@@ -73,8 +77,11 @@ const TILES = {
   TILE_COUNT: 1024,
 };
 
-/* The ranges of classifyZone in src/queryTool.js, with its names from
- * src/text.js. Each kind runs up to the next one. */
+/**
+ * The ranges of classifyZone in src/queryTool.js, with its names from
+ * src/text.js. Each kind runs up to the next one.
+ * @type {[number, string][]}
+ */
 const KINDS = [
   [TILES.DIRT, 'Clear'],
   [TILES.RIVER, 'Water'],
@@ -105,13 +112,21 @@ const KINDS = [
   [TILES.NUKESWIRL1, 'Nuclear Power'],
 ];
 
+/**
+ * @param {number} value
+ * @returns {number}
+ */
 function tileIndex(value) {
   return value & FLAGS.BIT_MASK;
 }
 
-/* The query tool counts the coal plant's smoke as the plant. It has no
+/**
+ * The query tool counts the coal plant's smoke as the plant. It has no
  * range for the explosions and the churches added after tile 955, so
- * those are named here. */
+ * those are named here.
+ * @param {number} index
+ * @returns {string}
+ */
 function tileKind(index) {
   if (index >= TILES.COALSMOKE1 && index < TILES.FOOTBALLGAME1) {
     return 'Coal Power';
@@ -125,6 +140,7 @@ function tileKind(index) {
     return 'Residential';
   }
 
+  /** @type {string} */
   let kind = KINDS[0][1];
 
   for (const [first, name] of KINDS) {
@@ -138,16 +154,23 @@ function tileKind(index) {
   return kind;
 }
 
-// What the tile is within its kind, where the tile number says more
+/**
+ * What the tile is within its kind, where the tile number says more.
+ * @param {number} index
+ * @returns {string}
+ */
 function tileDetail(index) {
   if (index >= TILES.FIRSTRIVEDGE && index <= TILES.LASTRIVEDGE) {
     return 'shore';
   }
 
   if (index >= TILES.ROADBASE && index <= TILES.LASTROAD) {
+    /** @type {number} */
     const piece = (index - TILES.ROADBASE) % 16;
+    /** @type {string} */
     const traffic = index >= TILES.HTRFBASE ? 'heavy traffic' :
       index >= TILES.LTRFBASE ? 'light traffic' : '';
+    /** @type {string[]} */
     const parts = [];
 
     if (piece === 0 || piece === 1) {
@@ -202,10 +225,17 @@ function tileDetail(index) {
   return '';
 }
 
-// One line for a raw map value: kind, detail and the flags that matter
+/**
+ * One line for a raw map value: kind, detail and the flags that matter.
+ * @param {number} value
+ * @returns {string}
+ */
 function describeTile(value) {
+  /** @type {number} */
   const index = tileIndex(value);
+  /** @type {string[]} */
   const parts = [tileKind(index)];
+  /** @type {string} */
   const detail = tileDetail(index);
 
   if (detail !== '') {
@@ -223,7 +253,11 @@ function describeTile(value) {
   return parts.join(', ');
 }
 
-// The browser blinks a lightning bolt on these (src/animationManager.js)
+/**
+ * The browser blinks a lightning bolt on these (src/animationManager.js).
+ * @param {number} value
+ * @returns {boolean}
+ */
 function isUnpoweredZone(value) {
   return (value & FLAGS.ZONEBIT) !== 0 && (value & FLAGS.POWERBIT) === 0;
 }
@@ -236,5 +270,4 @@ export {
   describeTile,
   isUnpoweredZone,
   tileIndex,
-  tileKind,
 };

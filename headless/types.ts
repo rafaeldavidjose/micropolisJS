@@ -382,6 +382,7 @@ export type {
   BudgetPercentages,
   BudgetWindowRecord,
   CensusLike,
+  CityDate,
   CityState,
   CityView,
   CreateCityOptions,
