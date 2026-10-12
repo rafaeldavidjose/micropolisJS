@@ -76,7 +76,7 @@ function assertSame(quote: ActionResult, result: ActionResult): void {
   }
 }
 
-test('quotes: a park and a bulldozed zone cost what was quoted', () => {
+test('quotes: a park and a bulldozed zone cost what was quoted', (): void => {
   const city: SimulationLike = createDevelopedCity(SEED);
   const map: MapLike = getMap(city);
   const bare: Position = findTile(map,
@@ -113,7 +113,7 @@ test('quotes: a park and a bulldozed zone cost what was quoted', () => {
   assert.ok(zones > 10);
 });
 
-test('quotes: random builds and bulldozing cost what was quoted', () => {
+test('quotes: random builds and bulldozing cost what was quoted', (): void => {
   const city: SimulationLike = createDevelopedCity(SEED);
   const random: () => number = makeRandom(SEED);
   const pick: (limit: number) => number = (limit: number): number =>
@@ -147,7 +147,7 @@ test('quotes: random builds and bulldozing cost what was quoted', () => {
   }
 });
 
-test('quotes: settings cost nothing and match the actions', () => {
+test('quotes: settings cost nothing and match the actions', (): void => {
   const city: SimulationLike = createDevelopedCity(SEED);
 
   for (const rate of [0, 7, 20, -1, 21, 2.5]) {
@@ -170,7 +170,8 @@ test('quotes: settings cost nothing and match the actions', () => {
 
 /* createCity seeds the game's generator, so two cities made the same way
  * draw the same next number unless something in between drew one. */
-test('quotes: quoting changes nothing and draws no random numbers', () => {
+test('quotes: quoting changes nothing and draws no random numbers',
+  (): void => {
   const quoted: SimulationLike = createDevelopedCity(SEED);
   const map: MapLike = getMap(quoted);
   const bare: Position = findTile(map,

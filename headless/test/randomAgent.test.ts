@@ -43,7 +43,8 @@ function totalDraws(log: RunLog): number {
     sum + (turn.agent?.draws as number), 0);
 }
 
-test('random agent: the same seeds give the same run', async () => {
+test('random agent: the same seeds give the same run',
+  async (): Promise<void> => {
   const first: RunLog = await runGame(createRandomAgent({ seed: 7 }), OPTIONS);
   const second: RunLog = await runGame(createRandomAgent({ seed: 7 }),
     OPTIONS);
@@ -52,7 +53,8 @@ test('random agent: the same seeds give the same run', async () => {
   assert.ok(allActions(first).length > 0);
 });
 
-test('random agent: another agent seed gives another run', async () => {
+test('random agent: another agent seed gives another run',
+  async (): Promise<void> => {
   const first: RunLog = await runGame(createRandomAgent({ seed: 7 }), OPTIONS);
   const second: RunLog = await runGame(createRandomAgent({ seed: 8 }),
     OPTIONS);
@@ -64,7 +66,8 @@ test('random agent: another agent seed gives another run', async () => {
  * against a passive run. On an empty map a moved generator can leave the
  * city the same for years, so the next number the game would draw is
  * compared too. */
-test('random agent: its draws do not move the game generator', async () => {
+test('random agent: its draws do not move the game generator',
+  async (): Promise<void> => {
   const random: Agent = createRandomAgent({ seed: 7 });
   const quiet: Agent = {
     name: 'quiet',
@@ -88,7 +91,8 @@ test('random agent: its draws do not move the game generator', async () => {
     passiveLog.turns.map((turn: TurnLog): unknown => turn.state));
 });
 
-test('random agent: it keeps to the limits and the weights', async () => {
+test('random agent: it keeps to the limits and the weights',
+  async (): Promise<void> => {
   const routes: RunLog = await runGame(createRandomAgent({
     seed: 3,
     weights: { building: 0, bulldoze: 0, tax: 0, budget: 0, autoBudget: 0,
@@ -138,7 +142,7 @@ function hasTile(tiles: Position[], x: number, y: number): boolean {
 
 // With this seed the land around 58, 47 is clear, see actions.test.ts
 test('random agent: routes start on their kind or next to a building',
-  () => {
+  (): void => {
   const city: SimulationLike = createCity({
     seed: 20260926, level: Simulation.LEVEL_EASY, disasters: false,
   });
@@ -173,7 +177,8 @@ test('random agent: routes start on their kind or next to a building',
 
 /* Every route checked against the map of its turn, rebuilt from the log.
  * Routes from the first turns, before anything is built, start anywhere. */
-test('random agent: every route it plays starts on a valid tile', async () => {
+test('random agent: every route it plays starts on a valid tile',
+  async (): Promise<void> => {
   const log: RunLog = await runGame(createRandomAgent({
     seed: 11,
     weights: { route: 3, building: 2, bulldoze: 0, tax: 0, budget: 0,

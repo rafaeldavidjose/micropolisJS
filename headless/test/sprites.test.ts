@@ -75,7 +75,7 @@ function recordTornado(): MonthRecord[] {
   return records;
 }
 
-test('tornado: stepMonths moves it', () => {
+test('tornado: stepMonths moves it', (): void => {
   const city: SimulationLike = createDevelopedCity(SEED);
   const tornado: SpriteLike = addTornado(city);
 
@@ -84,7 +84,7 @@ test('tornado: stepMonths moves it', () => {
   assert.notDeepEqual([tornado.worldX, tornado.worldY], [START_X, START_Y]);
 });
 
-test('tornado: it destroys road on its way', () => {
+test('tornado: it destroys road on its way', (): void => {
   const city: SimulationLike = createDevelopedCity(SEED);
   const roadsBefore: number = countRoadTiles(city);
 
@@ -94,7 +94,7 @@ test('tornado: it destroys road on its way', () => {
   assert.ok(countRoadTiles(city) < roadsBefore);
 });
 
-test('tornado: the same run twice gives the same city', () => {
+test('tornado: the same run twice gives the same city', (): void => {
   const firstRun: MonthRecord[] = recordTornado();
   const secondRun: MonthRecord[] = recordTornado();
 

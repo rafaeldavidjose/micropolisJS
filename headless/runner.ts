@@ -80,6 +80,7 @@ function getUnemployment(census: CensusLike): number {
   }
 
   const ratio: number = census.resPop / workerCount;
+
   return Math.min(Math.round((ratio - 1) * 255), 255);
 }
 

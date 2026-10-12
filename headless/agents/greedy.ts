@@ -176,6 +176,7 @@ function isPassable(view: CityView, plan: TurnPlan, tile: Position): boolean {
   }
 
   const value: number = view.map.getTileValue(tile.x, tile.y);
+
   return conducts(value) && !isBuilding(value) && !isRoad(value);
 }
 

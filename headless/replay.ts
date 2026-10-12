@@ -31,7 +31,12 @@ const FILES: Record<string, [string, string]> = {
 
 const DEMO_SEED: number = 1;
 
-const { values, positionals } = parseArgs({
+interface ReplayArguments {
+  values: { 'port': string; 'no-open': boolean };
+  positionals: string[];
+}
+
+const { values, positionals }: ReplayArguments = parseArgs({
   allowPositionals: true,
   options: {
     'port': { type: 'string', default: '0' },
@@ -42,6 +47,7 @@ const { values, positionals } = parseArgs({
 function openBrowser(url: string): void {
   const command: string = process.platform === 'win32' ? 'explorer.exe' :
     process.platform === 'darwin' ? 'open' : 'xdg-open';
+
   spawn(command, [url], { detached: true, stdio: 'ignore' }).unref();
 }
 
@@ -84,7 +90,7 @@ function answer(request: IncomingMessage, response: ServerResponse): void {
 
 const server: Server = createServer(answer);
 
-server.listen(Number(values.port), '127.0.0.1', () => {
+server.listen(Number(values.port), '127.0.0.1', (): void => {
   const port: number = (server.address() as AddressInfo).port;
   const url: string = `http://127.0.0.1:${port}/?log=log.json&name=` +
     encodeURIComponent(logName);

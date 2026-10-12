@@ -247,8 +247,6 @@ interface MapView {
   getTileValue(x: number, y: number): number;
 }
 
-/* What an agent sees at the start of a turn. Quotes and plans are made
- * against the city as it is then, before any of the agent's actions. */
 /* A zone or building by its centre tile, with the power a player sees:
  * the browser blinks a lightning bolt on the centre of one without power. */
 interface ZoneView {
@@ -258,6 +256,8 @@ interface ZoneView {
   powered: boolean;
 }
 
+/* What an agent sees at the start of a turn. Quotes and plans are made
+ * against the city as it is then, before any of the agent's actions. */
 interface CityView {
   turn: number;
   maxActions: number;
@@ -379,11 +379,9 @@ export type {
   ActionResult,
   Agent,
   AppliedAction,
-  BudgetLike,
   BudgetPercentages,
   BudgetWindowRecord,
   CensusLike,
-  CityDate,
   CityState,
   CityView,
   CreateCityOptions,

@@ -74,7 +74,8 @@ function readTiles(map: MapLike): number[] {
   return tiles;
 }
 
-test('game: a passive run is the same as stepping the city', async () => {
+test('game: a passive run is the same as stepping the city',
+  async (): Promise<void> => {
   const log: RunLog = await runGame(passiveAgent, {
     seed: SEED, level: Simulation.LEVEL_HARD, disasters: true,
     turns: 8, monthsPerTurn: 3,
@@ -91,7 +92,8 @@ test('game: a passive run is the same as stepping the city', async () => {
   assert.deepEqual(log.final.date, { year: 1902, month: 0 });
 });
 
-test('game: actions are applied in order and their results kept', async () => {
+test('game: actions are applied in order and their results kept',
+  async (): Promise<void> => {
   const log: RunLog = await runGame(
     scriptedAgent([...FIRST_TURN, ...BROKEN]),
     { seed: SEED, turns: 2, maxActionsPerTurn: 20 });
@@ -121,7 +123,8 @@ test('game: actions are applied in order and their results kept', async () => {
     2);
 });
 
-test('game: actions past the limit are dropped and counted', async () => {
+test('game: actions past the limit are dropped and counted',
+  async (): Promise<void> => {
   const log: RunLog = await runGame(scriptedAgent(FIRST_TURN),
     { seed: SEED, turns: 1, maxActionsPerTurn: 3 });
 
@@ -129,7 +132,8 @@ test('game: actions past the limit are dropped and counted', async () => {
   assert.equal(log.turns[0].dropped, FIRST_TURN.length - 3);
 });
 
-test('game: a quote in the view matches the applied action', async () => {
+test('game: a quote in the view matches the applied action',
+  async (): Promise<void> => {
   let quote: ActionResult | null = null;
   const agent: Agent = {
     name: 'quoting',
@@ -147,7 +151,7 @@ test('game: a quote in the view matches the applied action', async () => {
 /* The log keeps the first map and the changes of every turn, which a
  * replay needs. Replaying the same actions by hand gives the same city. */
 test('game: the map changes in the log add up to the final map',
-  async () => {
+  async (): Promise<void> => {
   const log: RunLog = await runGame(scriptedAgent(FIRST_TURN),
     { seed: SEED, turns: 6, monthsPerTurn: 2, maxActionsPerTurn: 20 });
 
@@ -178,7 +182,8 @@ test('game: the map changes in the log add up to the final map',
   assert.equal(log.final.hash, hashCity(city));
 });
 
-test('game: the same agent and options give the same log', async () => {
+test('game: the same agent and options give the same log',
+  async (): Promise<void> => {
   const options: Partial<GameOptions> & { seed: number } =
     { seed: SEED, turns: 4, maxActionsPerTurn: 20 };
   const first: RunLog = await runGame(scriptedAgent(FIRST_TURN), options);
@@ -187,7 +192,7 @@ test('game: the same agent and options give the same log', async () => {
   assert.deepEqual(first, second);
 });
 
-test('game: an agent can answer with a promise', async () => {
+test('game: an agent can answer with a promise', async (): Promise<void> => {
   const waiting: Agent = {
     name: 'scripted',
     decide: async (view: CityView): Promise<GameAction[]> =>
@@ -200,7 +205,7 @@ test('game: an agent can answer with a promise', async () => {
     await runGame(scriptedAgent(FIRST_TURN), options));
 });
 
-test('game: the log is written as JSON', async () => {
+test('game: the log is written as JSON', async (): Promise<void> => {
   const log: RunLog = await runGame(passiveAgent, { seed: SEED, turns: 2 });
   const path: string = join(mkdtempSync(join(tmpdir(), 'run-')), 'log.json');
 
@@ -212,7 +217,8 @@ test('game: the log is written as JSON', async () => {
 /* On hard with disasters on, a monster comes to the demo town on seed 5 in
  * the second turn. Reading the sprites must not change the run, so the
  * city, the states and the game's next random number are the same. */
-test('game: recording sprites does not change the run', async () => {
+test('game: recording sprites does not change the run',
+  async (): Promise<void> => {
   const options: Partial<GameOptions> & { seed: number } = {
     seed: 5, level: Simulation.LEVEL_HARD, disasters: true, turns: 6,
   };
@@ -241,7 +247,8 @@ test('game: recording sprites does not change the run', async () => {
 
 /* A residential zone with no plant has no power. In the demo town, once
  * its coal plant runs, the plant and the zones next to it have power. */
-test('game: the view lists every zone with its power', async () => {
+test('game: the view lists every zone with its power',
+  async (): Promise<void> => {
   const seen: ZoneView[][] = [];
   const watched: (inner: Agent) => Agent = (inner: Agent): Agent => ({
     name: inner.name,

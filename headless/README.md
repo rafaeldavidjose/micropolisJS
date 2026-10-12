@@ -28,8 +28,9 @@ directly.
 npm run test:headless # all headless tests (node:test)
 npm run lint # the code style checks
 npm run bench:headless # times 20 in-game years
-npm run play:headless -- --agent random --seed 3 --level hard --disasters on --out run.json
-npm run replay -- runs/run.json  # opens the replay viewer on a run log
+npm run play:headless -- --agent random --seed 3 --level hard \
+  --disasters on --out run.json
+npm run replay -- runs/run.json # opens the replay viewer on a run log
 ```
 
 `play:headless` plays one game and writes its run log. The options are
@@ -60,12 +61,17 @@ log in `budget.ts`. The game loop is in `game.ts` and the agents are in
 ```ts
 import { createCity, stepMonths, getState, saveCity, loadCity, Simulation }
   from './runner.ts';
+import type { CityState, SaveData, SimulationLike } from './types.ts';
 
-const city = createCity({ seed: 12345, level: Simulation.LEVEL_HARD, disasters: true });
+const city: SimulationLike = createCity({
+  seed: 12345,
+  level: Simulation.LEVEL_HARD,
+  disasters: true,
+});
 stepMonths(city, 12);
-const state = getState(city);
-const saved = saveCity(city);
-const loaded = loadCity(saved);
+const state: CityState = getState(city);
+const saved: SaveData = saveCity(city);
+const loaded: SimulationLike = loadCity(saved);
 ```
 
 `createCity` takes the level as `Simulation.LEVEL_EASY`, `LEVEL_MED` or
@@ -111,8 +117,9 @@ next. `createCity` and `loadCity` both reseed the generator.
 ```ts
 import { build, bulldoze, setTaxRate, setBudgetPercentages, setAutoBudget }
   from './actions.ts';
+import type { ActionResult } from './types.ts';
 
-const result = build(city, 'residential', 58, 47);
+const result: ActionResult = build(city, 'residential', 58, 47);
 // { success: true, cost: 100, reason: null }
 ```
 
@@ -197,11 +204,14 @@ never draws from the generator, so it cannot change a run.
 
 ```ts
 import { planRoute, buildRoute } from './routes.ts';
+import type { ActionResult, RoutePlan } from './types.ts';
 
-const plan = planRoute(city, 'road', { x: 58, y: 47 }, { x: 64, y: 47 });
-// plan.cost is 72, plan.tiles starts with
-// { x: 58, y: 47, cost: 11, kind: 'new' }, { x: 59, y: 47, cost: 11, kind: 'new' }
-const result = buildRoute(city, plan);
+const plan: RoutePlan = planRoute(city, 'road', { x: 58, y: 47 },
+  { x: 64, y: 47 });
+/* plan.cost is 72, and plan.tiles starts with
+ * { x: 58, y: 47, cost: 11, kind: 'new' },
+ * { x: 59, y: 47, cost: 11, kind: 'new' } */
+const result: ActionResult = buildRoute(city, plan);
 // { success: true, cost: 72, reason: null }
 ```
 
@@ -272,8 +282,9 @@ of a failed plan. A failed `buildRoute` changes nothing.
 ```ts
 import { runGame, writeRunLog } from './game.ts';
 import { passiveAgent } from './agents/passive.ts';
+import type { RunLog } from './types.ts';
 
-const log = await runGame(passiveAgent, { seed: 1, turns: 8 });
+const log: RunLog = await runGame(passiveAgent, { seed: 1, turns: 8 });
 writeRunLog('run.json', log);
 ```
 
@@ -366,7 +377,8 @@ tiles.
 ```ts
 import { createRandomAgent } from './agents/random.ts';
 
-const log = await runGame(createRandomAgent({ seed: 7 }), { seed: 1 });
+const log: RunLog = await runGame(createRandomAgent({ seed: 7 }),
+  { seed: 1 });
 ```
 
 Each turn the random agent takes a random number of slots, from 0 to the
@@ -412,7 +424,7 @@ actions at the same points.
 ```ts
 import { createGreedyAgent } from './agents/greedy.ts';
 
-const log = await runGame(createGreedyAgent(), { seed: 1 });
+const log: RunLog = await runGame(createGreedyAgent(), { seed: 1 });
 ```
 
 The greedy agent follows the most immediate signal, demand. Each turn,
@@ -493,7 +505,7 @@ needed.
 ```ts
 import { createDemoAgent } from './agents/demo.ts';
 
-const log = await runGame(createDemoAgent(), { seed: 1 });
+const log: RunLog = await runGame(createDemoAgent(), { seed: 1 });
 ```
 
 The demo agent builds the same small town on every map, so the replay
@@ -516,8 +528,8 @@ site fits, and the town never gets power.
 ## Replay viewer
 
 ```sh
-npm run replay -- runs/run.json  # a log from play:headless or writeRunLog
-npm run replay              # plays a game with the demo agent and shows it
+npm run replay -- runs/run.json # a log from play:headless or writeRunLog
+npm run replay # plays a game with the demo agent and shows it
 ```
 
 `replay.ts` starts a small server on 127.0.0.1 and opens the viewer in
@@ -634,10 +646,10 @@ returns the records.
 ```ts
 {
   date: { year: 1902, month: 0 },
-  funds: 512,        // when the window opened, before taxes and spending
-  taxes: 19,         // collected that January
+  funds: 512, // when the window opened, before taxes and spending
+  taxes: 19, // collected that January
   fundsAfter: 0,
-  road: 100,         // percent of full funding the city paid
+  road: 100, // percent of full funding the city paid
   fire: 41,
   police: 0,
   autoBudgetWasOn: true,

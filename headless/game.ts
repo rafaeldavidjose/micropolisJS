@@ -147,6 +147,7 @@ function applyAction(city: SimulationLike, action: unknown): ActionResult {
 
       const plan: RoutePlan = planRoute(city, gameAction.tool,
         gameAction.from, gameAction.to);
+
       return buildRoute(city, plan);
     }
     case 'bulldoze':
@@ -365,7 +366,6 @@ export {
   DEFAULT_OPTIONS,
   allBudgetWindows,
   applyAction,
-  quoteAction,
   runGame,
   writeRunLog,
 };

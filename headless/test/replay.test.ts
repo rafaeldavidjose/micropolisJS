@@ -46,7 +46,8 @@ function readTiles(map: MapLike): number[] {
  * actions in the log, and its map read at the start of every turn and at
  * the end. The positions are checked from both ends towards the middle,
  * so most of them start from a copy made for an earlier position. */
-test('replay: the map rebuilt for every turn matches the city', async () => {
+test('replay: the map rebuilt for every turn matches the city',
+  async (): Promise<void> => {
   const log: RunLog = await runGame(createDemoAgent(),
     { seed: SEED, turns: 40 });
   const city: SimulationLike = createCity({
@@ -80,7 +81,7 @@ test('replay: the map rebuilt for every turn matches the city', async () => {
   }
 });
 
-test('replay: the viewer has the engine tile numbers and flags', () => {
+test('replay: the viewer has the engine tile numbers and flags', (): void => {
   const values: Record<string, unknown> = TileValues;
   const flags: Record<string, unknown> = TileFlags;
 
@@ -104,7 +105,7 @@ test('replay: the viewer has the engine tile numbers and flags', () => {
 });
 
 test('replay: buildings sit on their centre tile, routes on their tiles',
-  () => {
+  (): void => {
   assert.deepEqual(actionShape({
     action: { type: 'build', tool: 'coal', x: 10, y: 20 }, result: OK,
   }), { kind: 'area', x: 9, y: 19, width: 4, height: 4 });
@@ -130,7 +131,7 @@ test('replay: buildings sit on their centre tile, routes on their tiles',
 
 /* A turn's sprites are sampled while the city runs after the actions, so
  * the start of a turn shows the last sample of the turn before. */
-test('replay: sprites at rest, inside a turn and in old logs', () => {
+test('replay: sprites at rest, inside a turn and in old logs', (): void => {
   const tornado: SpriteRecord = [6, 2, 100, 60];
   const train: SpriteRecord = [1, 3, 300, 200];
   const log: Pick<RunLog, 'spriteSampling'> & {

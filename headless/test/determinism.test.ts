@@ -47,21 +47,21 @@ function continueFromSave(saved: SaveData): YearRecord[] {
   return recordYears(loadCity(saved), YEARS / 2);
 }
 
-test('same seed: two runs match at every year for 20 years', () => {
+test('same seed: two runs match at every year for 20 years', (): void => {
   const firstRun: YearRecord[] = recordYears(createHardCity(SEED_A), YEARS);
   const secondRun: YearRecord[] = recordYears(createHardCity(SEED_A), YEARS);
 
   assert.deepEqual(firstRun, secondRun);
 });
 
-test('different seeds: final state differs', () => {
+test('different seeds: final state differs', (): void => {
   const firstRun: YearRecord[] = recordYears(createHardCity(SEED_A), YEARS);
   const secondRun: YearRecord[] = recordYears(createHardCity(SEED_B), YEARS);
 
   assert.notEqual(firstRun[YEARS - 1].hash, secondRun[YEARS - 1].hash);
 });
 
-test('developed city: same seed gives the same run for 20 years', () => {
+test('developed city: same seed gives the same run for 20 years', (): void => {
   const firstRun: YearRecord[] =
     recordYears(createDevelopedCity(SEED_A), YEARS);
   const secondRun: YearRecord[] =
@@ -73,7 +73,7 @@ test('developed city: same seed gives the same run for 20 years', () => {
   assert.ok(firstRun[YEARS - 1].state.population > 0);
 });
 
-test('save/load: a loaded city keeps the disasters option', () => {
+test('save/load: a loaded city keeps the disasters option', (): void => {
   const disasterOptions: boolean[] = [true, false];
 
   for (const disasters of disasterOptions) {
@@ -88,7 +88,7 @@ test('save/load: a loaded city keeps the disasters option', () => {
   }
 });
 
-test('save/load: loading the same save twice gives the same run', () => {
+test('save/load: loading the same save twice gives the same run', (): void => {
   const city: SimulationLike = createHardCity(SEED_A);
   stepMonths(city, 12 * (YEARS / 2));
   const saved: SaveData = saveCity(city);
@@ -104,7 +104,7 @@ test('save/load: loading the same save twice gives the same run', () => {
 });
 
 test('save/load: a loaded city continues like an uninterrupted run',
-  { todo: RESUME_TODO }, () => {
+  { todo: RESUME_TODO }, (): void => {
   const uninterrupted: SimulationLike = createHardCity(SEED_A);
   stepMonths(uninterrupted, 12 * YEARS);
 

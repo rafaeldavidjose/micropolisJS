@@ -202,6 +202,7 @@ const ROUTE_TOOLS: readonly string[] = Object.keys(RULES);
 // The tile has a piece of the tool's kind, which a route takes as it is
 function hasPiece(toolName: string, value: number): boolean {
   const rules: ToolRules | undefined = RULES[toolName];
+
   return rules !== undefined && rules.hasKind(normalize(value));
 }
 
@@ -252,15 +253,16 @@ function isWater(value: number): boolean {
 function layBridge(rules: ToolRules, map: MapLike, x: number, y: number,
     previous: PathTile | null): Step | null {
   for (const [side, dx, dy] of SIDES) {
-    const nx: number = x + dx;
-    const ny: number = y + dy;
+    const neighbourX: number = x + dx;
+    const neighbourY: number = y + dy;
 
-    if (!isOnMap(map, nx, ny)) {
+    if (!isOnMap(map, neighbourX, neighbourY)) {
       continue;
     }
 
-    const piece: Piece = previous !== null && previous.x === nx &&
-      previous.y === ny ? previous.step.piece : pieceOf(map.getTile(nx, ny));
+    const piece: Piece = previous !== null && previous.x === neighbourX &&
+      previous.y === neighbourY ? previous.step.piece :
+      pieceOf(map.getTile(neighbourX, neighbourY));
 
     if (rules.bridgesFrom(side, piece)) {
       const horizontal: boolean = side === 'east' || side === 'west';
@@ -441,20 +443,20 @@ function search(rules: ToolRules, map: MapLike, from: Position,
     };
 
     for (const [, dx, dy] of SIDES) {
-      const nx: number = here.x + dx;
-      const ny: number = here.y + dy;
+      const nextX: number = here.x + dx;
+      const nextY: number = here.y + dy;
 
-      if (!isOnMap(map, nx, ny)) {
+      if (!isOnMap(map, nextX, nextY)) {
         continue;
       }
 
-      const nextTile: number = ny * map.width + nx;
+      const nextTile: number = nextY * map.width + nextX;
 
       if (banned.has(edgeKey(entry.state, nextTile))) {
         continue;
       }
 
-      const step: Step | null = layStep(rules, map, nx, ny, here);
+      const step: Step | null = layStep(rules, map, nextX, nextY, here);
 
       if (step === null) {
         continue;

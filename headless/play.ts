@@ -25,7 +25,21 @@ const LEVELS: Record<string, number> = {
   hard: Simulation.LEVEL_HARD,
 };
 
-const { values } = parseArgs({
+interface PlayArguments {
+  values: {
+    'agent': string;
+    'seed': string;
+    'agent-seed'?: string;
+    'level': string;
+    'disasters': string;
+    'turns': string;
+    'months': string;
+    'max-actions': string;
+    'out': string;
+  };
+}
+
+const { values }: PlayArguments = parseArgs({
   options: {
     'agent': { type: 'string', default: 'random' },
     'seed': { type: 'string', default: '1' },
@@ -74,26 +88,25 @@ function makeAgent(name: string, seed: number): Agent {
     ', use random, greedy, passive or demo');
 }
 
-if (!(values.level as string in LEVELS)) {
+if (!(values.level in LEVELS)) {
   throw new Error('--level must be easy, medium or hard');
 }
 
-const seed: number = wholeNumber('seed', values.seed as string);
+const seed: number = wholeNumber('seed', values.seed);
 const agentSeed: number = values['agent-seed'] === undefined ? seed :
   wholeNumber('agent-seed', values['agent-seed']);
 
 const log: RunLog = await runGame(
-  makeAgent(values.agent as string, agentSeed), {
+  makeAgent(values.agent, agentSeed), {
     seed: seed,
-    level: LEVELS[values.level as string],
+    level: LEVELS[values.level],
     disasters: values.disasters === 'on',
-    turns: wholeNumber('turns', values.turns as string),
-    monthsPerTurn: wholeNumber('months', values.months as string),
-    maxActionsPerTurn: wholeNumber('max-actions',
-      values['max-actions'] as string),
+    turns: wholeNumber('turns', values.turns),
+    monthsPerTurn: wholeNumber('months', values.months),
+    maxActionsPerTurn: wholeNumber('max-actions', values['max-actions']),
   });
 
-const out: string = values.out as string;
+const out: string = values.out;
 const path: string = basename(out) === out ? join(RUNS, out) : out;
 
 mkdirSync(dirname(path), { recursive: true });

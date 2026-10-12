@@ -25,7 +25,8 @@ function allApplied(log: RunLog): AppliedAction[] {
   return log.turns.flatMap((turn: TurnLog): AppliedAction[] => turn.actions);
 }
 
-test('greedy agent: the same seed gives the same run', async () => {
+test('greedy agent: the same seed gives the same run',
+  async (): Promise<void> => {
   const first: RunLog = await runGame(createGreedyAgent(), OPTIONS);
   const second: RunLog = await runGame(createGreedyAgent(), OPTIONS);
 
@@ -33,7 +34,8 @@ test('greedy agent: the same seed gives the same run', async () => {
   assert.equal(first.final.hash, second.final.hash);
 });
 
-test('greedy agent: it builds a plant first, then a town', async () => {
+test('greedy agent: it builds a plant first, then a town',
+  async (): Promise<void> => {
   const log: RunLog = await runGame(createGreedyAgent(), OPTIONS);
   const first: GameAction = log.turns[0].actions[0].action as GameAction;
 
@@ -43,7 +45,8 @@ test('greedy agent: it builds a plant first, then a town', async () => {
 
 /* The agent only gives the two ends of a route. The tiles in the log come
  * from planRoute when the action is applied. */
-test('greedy agent: every route it plays comes from planRoute', async () => {
+test('greedy agent: every route it plays comes from planRoute',
+  async (): Promise<void> => {
   const log: RunLog = await runGame(createGreedyAgent(), OPTIONS);
   const routes: AppliedAction[] = allApplied(log).filter(
     (applied: AppliedAction): boolean =>
@@ -64,7 +67,8 @@ test('greedy agent: every route it plays comes from planRoute', async () => {
   }
 });
 
-test('greedy agent: it never touches the taxes or the budget', async () => {
+test('greedy agent: it never touches the taxes or the budget',
+  async (): Promise<void> => {
   const log: RunLog = await runGame(createGreedyAgent(),
     { ...OPTIONS, turns: 40 });
   const types: Set<string> = new Set(allApplied(log).map(
@@ -79,7 +83,7 @@ test('greedy agent: it never touches the taxes or the budget', async () => {
  * agent returns must have been quoted that turn with success, and the
  * turn must be able to pay for all of them. */
 test('greedy agent: it only plays actions whose quote succeeded',
-  async () => {
+  async (): Promise<void> => {
   const greedy: Agent = createGreedyAgent();
   let checked: number = 0;
   const watched: Agent = {
@@ -122,7 +126,8 @@ test('greedy agent: it only plays actions whose quote succeeded',
  * on easy seed 4 after turn 19 and on seed 6 after turn 159, with money,
  * demand and free land left. Now it builds again after those turns, and in
  * every turn with a positive demand it either acts or waits for money. */
-test('greedy agent: it keeps growing where it used to stop', async () => {
+test('greedy agent: it keeps growing where it used to stop',
+  async (): Promise<void> => {
   const cases: { seed: number; stoppedAfter: number; turns: number }[] = [
     { seed: 4, stoppedAfter: 19, turns: 40 },
     { seed: 6, stoppedAfter: 159, turns: 175 },

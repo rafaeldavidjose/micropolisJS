@@ -111,7 +111,7 @@ function richCity(): SimulationLike {
   return city;
 }
 
-test('routes: the planned cost is what buildRoute spends', () => {
+test('routes: the planned cost is what buildRoute spends', (): void => {
   const city: SimulationLike = richCity();
   const map: MapLike = getMap(city);
   const seen: Record<string, number> = {
@@ -167,7 +167,8 @@ test('routes: the planned cost is what buildRoute spends', () => {
 });
 
 // The cities share one random generator, so one run ends before the next
-test('routes: planning changes nothing and draws no random numbers', () => {
+test('routes: planning changes nothing and draws no random numbers',
+  (): void => {
   const planned: SimulationLike = createDevelopedCity(SEED);
   const hashBefore: string = hashCity(planned);
 
@@ -185,7 +186,7 @@ test('routes: planning changes nothing and draws no random numbers', () => {
   assert.equal(plannedHash, hashCity(untouched));
 });
 
-test('routes: the same city and endpoints give the same route', () => {
+test('routes: the same city and endpoints give the same route', (): void => {
   const requests: RouteRequest[] = randomRequests(30, SEED + 1);
   const first: RoutePlan[] = requests.map(
     (request: RouteRequest): RoutePlan => plan(createDevelopedCity(SEED),
@@ -198,7 +199,8 @@ test('routes: the same city and endpoints give the same route', () => {
   assert.ok(first.some((routePlan: RoutePlan): boolean => routePlan.success));
 });
 
-test('routes: positions off the map and unknown tools are refused', () => {
+test('routes: positions off the map and unknown tools are refused',
+  (): void => {
   const city: SimulationLike = richCity();
   const inside: Position = { x: 10, y: 10 };
 
@@ -214,7 +216,7 @@ test('routes: positions off the map and unknown tools are refused', () => {
 
 /* Four zones around one bare tile, so that tile has no free neighbour. The
  * tile itself can be reached by nothing, the zones are blocked. */
-test('routes: a tile closed in by zones has no route', () => {
+test('routes: a tile closed in by zones has no route', (): void => {
   const city: SimulationLike = richCity();
   const corner: Position = findBareLand(getMap(city), 7);
   const hole: Position = { x: corner.x + 3, y: corner.y + 3 };
@@ -235,7 +237,7 @@ test('routes: a tile closed in by zones has no route', () => {
   assert.equal(planRoute(city, 'road', outside, zones[0]).reason, 'blocked');
 });
 
-test('routes: not enough money builds nothing', () => {
+test('routes: not enough money builds nothing', (): void => {
   const city: SimulationLike = richCity();
   const routePlan: RoutePlan = planRoute(city, 'road',
     { x: 10, y: 10 }, { x: 100, y: 90 });
@@ -255,7 +257,7 @@ test('routes: not enough money builds nothing', () => {
   assert.equal(city.budget.totalFunds, 0);
 });
 
-test('routes: a plan is refused once its tiles changed', () => {
+test('routes: a plan is refused once its tiles changed', (): void => {
   const city: SimulationLike = richCity();
   const routePlan: RoutePlan = planRoute(city, 'road',
     { x: 10, y: 10 }, { x: 100, y: 90 });
@@ -270,7 +272,7 @@ test('routes: a plan is refused once its tiles changed', () => {
   assert.equal(hashCity(city), hashBefore);
 });
 
-test('routes: a failed plan builds nothing', () => {
+test('routes: a failed plan builds nothing', (): void => {
   const city: SimulationLike = richCity();
   const routePlan: RoutePlan = planRoute(city, 'road',
     { x: -1, y: 0 }, { x: 0, y: 0 });

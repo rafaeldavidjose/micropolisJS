@@ -76,12 +76,15 @@ function randomTile(rng: Rng, view: CityView): Position {
 }
 
 function touchesBuilding(map: MapView, x: number, y: number): boolean {
-  return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]: number[]) => {
-    const nx: number = x + dx;
-    const ny: number = y + dy;
+  const offsets: number[][] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
-    return nx >= 0 && ny >= 0 && nx < map.width && ny < map.height &&
-      isBuilding(map.getTileValue(nx, ny));
+  return offsets.some(([dx, dy]: number[]): boolean => {
+    const neighbourX: number = x + dx;
+    const neighbourY: number = y + dy;
+
+    return neighbourX >= 0 && neighbourY >= 0 && neighbourX < map.width &&
+      neighbourY < map.height &&
+      isBuilding(map.getTileValue(neighbourX, neighbourY));
   });
 }
 
@@ -239,10 +242,10 @@ function createRandomAgent(options: RandomAgentOptions): Agent {
       }
 
       report = turn;
+
       return actions;
     },
   };
 }
 
-export type { Category, RandomAgentOptions };
-export { CATEGORIES, createRandomAgent, routeStarts };
+export { createRandomAgent, routeStarts };

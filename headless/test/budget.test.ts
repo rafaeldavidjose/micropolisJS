@@ -14,7 +14,7 @@ import type {
 
 const SEED: number = 20260926;
 
-test('budget window: stepMonths answers it and time goes on', () => {
+test('budget window: stepMonths answers it and time goes on', (): void => {
   const city: SimulationLike = createPoorCity(SEED);
 
   for (let year: number = 1901; year <= 1906; year++) {
@@ -31,7 +31,7 @@ test('budget window: stepMonths answers it and time goes on', () => {
   assert.equal(getBudgetLog(city).length, 5);
 });
 
-test('budget window: the record has what the city could pay', () => {
+test('budget window: the record has what the city could pay', (): void => {
   const city: SimulationLike = createPoorCity(SEED);
 
   stepMonths(city, 12 * 3);
@@ -61,7 +61,8 @@ test('budget window: the record has what the city could pay', () => {
   });
 });
 
-test('budget window: the engine leaves auto budget off afterwards', () => {
+test('budget window: the engine leaves auto budget off afterwards',
+  (): void => {
   const city: SimulationLike = createPoorCity(SEED);
 
   assert.equal(city.budget.autoBudget, true);
@@ -71,7 +72,7 @@ test('budget window: the engine leaves auto budget off afterwards', () => {
   assert.equal(city.budget.autoBudget, false);
 });
 
-test('budget window: a city that can pay never gets one', () => {
+test('budget window: a city that can pay never gets one', (): void => {
   const city: SimulationLike = createDevelopedCity(SEED);
 
   stepMonths(city, 12 * 5);
@@ -81,7 +82,7 @@ test('budget window: a city that can pay never gets one', () => {
   assert.ok(getState(city).population > 0);
 });
 
-test('budget window: with auto budget off it opens every January', () => {
+test('budget window: with auto budget off it opens every January', (): void => {
   const city: SimulationLike = createDevelopedCity(SEED);
 
   setAutoBudget(city, false);
@@ -105,7 +106,7 @@ test('budget window: with auto budget off it opens every January', () => {
   assert.equal(getBudgetLog(city).length, 3);
 });
 
-test('budget window: the log is the same in two runs', () => {
+test('budget window: the log is the same in two runs', (): void => {
   function runPoorCity(): BudgetWindowRecord[] {
     const city: SimulationLike = createPoorCity(SEED);
 
@@ -117,7 +118,7 @@ test('budget window: the log is the same in two runs', () => {
   assert.deepEqual(runPoorCity(), runPoorCity());
 });
 
-test('budget window: getBudgetLog returns a copy', () => {
+test('budget window: getBudgetLog returns a copy', (): void => {
   const city: SimulationLike = createPoorCity(SEED);
 
   stepMonths(city, 12 * 2);
