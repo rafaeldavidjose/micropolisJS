@@ -30,8 +30,11 @@ const ZONE_TOOLS: readonly ZoneTool[] = [
 const ZONE_SIZE: number = 3;
 const PLANT_SIZE: number = 4;
 
-// A new road runs this far over free land, room for two zones on each side
+// The first road runs this far over free land, room for two zones a side
 const ROAD_LENGTH: number = 6;
+
+// How many road ends are tried in a turn, each one a full route search
+const ROAD_ENDS_TRIED: number = 20;
 
 // East, south, west, north: the order directions are tried in
 const DIRECTIONS: readonly Position[] = [
@@ -43,8 +46,8 @@ const DIRECTIONS: readonly Position[] = [
 
 /* The view stays as it was at the start of the turn, so the plan keeps
  * what earlier actions of the turn already promised: money, tiles, wired
- * zones, a new plant and a new road. Buildings also stay off the tile past
- * the end of each road, so the roads can always be extended. */
+ * zones, a new plant and a new road, and how many road ends it tried.
+ * Buildings also stay off the tile past the end of each road. */
 interface TurnPlan {
   funds: number;
   taken: Set<number>;
@@ -52,6 +55,7 @@ interface TurnPlan {
   wired: Set<number>;
   plantBuilt: boolean;
   roadBuilt: boolean;
+  roadTries: number;
   outOfMoney: boolean;
   actions: GameAction[];
   rules: number[];
@@ -77,13 +81,23 @@ function distanceSquared(from: Position, to: Position): number {
   return (from.x - to.x) ** 2 + (from.y - to.y) ** 2;
 }
 
-/* Sorts tiles by straight-line distance to a target, the closest first.
+/* Orders tiles by straight-line distance to a target, the closest first.
  * Ties go to the tile higher up the map, then to the one further left. */
+function compareDistance(first: Position, second: Position,
+    target: Position): number {
+  return distanceSquared(first, target) - distanceSquared(second, target) ||
+    first.y - second.y || first.x - second.x;
+}
+
 function sortByDistance<Tile extends Position>(tiles: Tile[],
     target: Position): Tile[] {
   return tiles.sort((first: Tile, second: Tile): number =>
-    distanceSquared(first, target) - distanceSquared(second, target) ||
-    first.y - second.y || first.x - second.x);
+    compareDistance(first, second, target));
+}
+
+function closestTile(tiles: Position[], target: Position): Position {
+  return tiles.reduce((best: Position, tile: Position): Position =>
+    compareDistance(tile, best, target) < 0 ? tile : best);
 }
 
 // A site is placed by its centre tile, one right of and below its corner
@@ -481,45 +495,27 @@ function zoneNextToRoad(view: CityView, plan: TurnPlan, tool: ZoneTool,
     centre);
 }
 
-/* A new road from the road tile closest to the city centre that has free
- * land next to it, or from the free tile closest to the centre while there
- * is no road, once in a turn. Its end is ROAD_LENGTH tiles away, in the
- * first direction where the next tile is free and the end is free land.
- * planRoute finds the way there, around what is in between. */
-function extendRoad(view: CityView, plan: TurnPlan,
+/* The first road, while there is none: from the free tile closest to the
+ * city centre, ROAD_LENGTH tiles in the first direction where the next tile
+ * is free and the end is free land, once in a turn. */
+function buildFirstRoad(view: CityView, plan: TurnPlan,
     centre: Position): Choice | null {
   const map: MapView = view.map;
-  const roads: Position[] = [];
   const land: Position[] = [];
-  let hasRoad: boolean = false;
+
+  if (plan.roadBuilt) {
+    return null;
+  }
 
   for (let y: number = 0; y < map.height; y++) {
     for (let x: number = 0; x < map.width; x++) {
-      const tile: Position = { x: x, y: y };
-
-      if (!isRoad(map.getTileValue(x, y))) {
-        if (isOpenLand(view, plan, tile)) {
-          land.push(tile);
-        }
-
-        continue;
-      }
-
-      hasRoad = true;
-
-      if (DIRECTIONS.some((direction: Position): boolean =>
-          isPassable(view, plan,
-            { x: x + direction.x, y: y + direction.y }))) {
-        roads.push(tile);
+      if (isOpenLand(view, plan, { x: x, y: y })) {
+        land.push({ x: x, y: y });
       }
     }
   }
 
-  if (!hasRoad && plan.roadBuilt) {
-    return null;
-  }
-
-  for (const from of sortByDistance(hasRoad ? roads : land, centre)) {
+  for (const from of sortByDistance(land, centre)) {
     for (const direction of DIRECTIONS) {
       const next: Position = { x: from.x + direction.x,
         y: from.y + direction.y };
@@ -529,12 +525,89 @@ function extendRoad(view: CityView, plan: TurnPlan,
       if (!isPassable(view, plan, next) || !isOpenLand(view, plan, to)) {
         continue;
       }
+
+      if (plan.roadTries >= ROAD_ENDS_TRIED) {
+        return null;
+      }
+
+      plan.roadTries++;
       const choice: Choice | null = routeChoice(view, plan, 4, 'road', from,
         to);
 
       if (plan.outOfMoney || choice !== null) {
         return choice;
       }
+    }
+  }
+
+  return null;
+}
+
+/* Free tiles next to an open zone site that no road touches yet, the
+ * closest to the city centre first. A road that ends on one of them opens
+ * that site for a zone. */
+function roadTargets(view: CityView, plan: TurnPlan,
+    centre: Position): Position[] {
+  const map: MapView = view.map;
+  const ends: Position[] = [];
+
+  for (let y: number = 1; y < map.height - 1; y++) {
+    for (let x: number = 1; x < map.width - 1; x++) {
+      const site: Position = { x: x, y: y };
+
+      if (!isOpenSite(view, plan, site, ZONE_SIZE)) {
+        continue;
+      }
+
+      const edges: Position[] = edgeTiles(site, ZONE_SIZE).filter(
+        (tile: Position): boolean => isOnMap(map, tile.x, tile.y));
+
+      if (edges.some((tile: Position): boolean =>
+          isRoad(map.getTileValue(tile.x, tile.y)))) {
+        continue;
+      }
+
+      ends.push(...edges.filter((tile: Position): boolean =>
+        isOpenLand(view, plan, tile)));
+    }
+  }
+
+  return sortByDistance(uniqueTiles(map, ends), centre);
+}
+
+/* A new road towards land the agent can build on, when no zone site
+ * touches a road. It ends on the first tile from roadTargets and starts on
+ * the road tile closest to that end, and planRoute finds the way, bridges
+ * included. When the route or its quote fails for a reason other than
+ * money, the next end is tried, up to ROAD_ENDS_TRIED in a turn. */
+function extendRoad(view: CityView, plan: TurnPlan,
+    centre: Position): Choice | null {
+  const map: MapView = view.map;
+  const roads: Position[] = [];
+
+  for (let y: number = 0; y < map.height; y++) {
+    for (let x: number = 0; x < map.width; x++) {
+      if (isRoad(map.getTileValue(x, y))) {
+        roads.push({ x: x, y: y });
+      }
+    }
+  }
+
+  if (roads.length === 0) {
+    return buildFirstRoad(view, plan, centre);
+  }
+
+  for (const to of roadTargets(view, plan, centre)) {
+    if (plan.roadTries >= ROAD_ENDS_TRIED) {
+      return null;
+    }
+
+    plan.roadTries++;
+    const choice: Choice | null = routeChoice(view, plan, 4, 'road',
+      closestTile(roads, to), to);
+
+    if (plan.outOfMoney || choice !== null) {
+      return choice;
     }
   }
 
@@ -594,7 +667,10 @@ function createGreedyAgent(): Agent {
 
   return {
     name: 'greedy',
-    settings: (): Record<string, unknown> => ({ roadLength: ROAD_LENGTH }),
+    settings: (): Record<string, unknown> => ({
+      firstRoadLength: ROAD_LENGTH,
+      roadEndsTried: ROAD_ENDS_TRIED,
+    }),
     report: (): Record<string, unknown> => report,
     decide: (view: CityView): GameAction[] => {
       const plan: TurnPlan = {
@@ -604,6 +680,7 @@ function createGreedyAgent(): Agent {
         wired: new Set(),
         plantBuilt: false,
         roadBuilt: false,
+        roadTries: 0,
         outOfMoney: false,
         actions: [],
         rules: [],

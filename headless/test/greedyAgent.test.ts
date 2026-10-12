@@ -117,3 +117,32 @@ test('greedy agent: it only plays actions whose quote succeeded',
   assert.ok(allApplied(log).every(
     (applied: AppliedAction): boolean => applied.result.success));
 });
+
+/* With a new road only 6 tiles straight ahead, the agent stopped for good
+ * on easy seed 4 after turn 19 and on seed 6 after turn 159, with money,
+ * demand and free land left. Now it builds again after those turns, and in
+ * every turn with a positive demand it either acts or waits for money. */
+test('greedy agent: it keeps growing where it used to stop', async () => {
+  const cases: { seed: number; stoppedAfter: number; turns: number }[] = [
+    { seed: 4, stoppedAfter: 19, turns: 40 },
+    { seed: 6, stoppedAfter: 159, turns: 175 },
+  ];
+
+  for (const { seed, stoppedAfter, turns } of cases) {
+    const log: RunLog = await runGame(createGreedyAgent(),
+      { seed: seed, turns: turns });
+    const later: TurnLog[] = log.turns.filter(
+      (turn: TurnLog): boolean => turn.turn > stoppedAfter);
+    const built: TurnLog[] = later.filter((turn: TurnLog): boolean =>
+      turn.actions.some((applied: AppliedAction): boolean =>
+        applied.result.success));
+    const stuck: TurnLog[] = later.filter((turn: TurnLog): boolean =>
+      turn.actions.length === 0 && turn.agent?.waitingForMoney === false &&
+      Math.max(turn.state.rci.residential, turn.state.rci.commercial,
+        turn.state.rci.industrial) > 0);
+
+    assert.ok(built.length > 0, 'seed ' + seed);
+    assert.deepEqual(stuck.map((turn: TurnLog): number => turn.turn), [],
+      'seed ' + seed);
+  }
+});

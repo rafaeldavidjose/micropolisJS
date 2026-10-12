@@ -449,13 +449,26 @@ point of the network closest to the zone, which is one of its power
 lines or free land next to it, to the tile next to the zone closest to
 that point. Rule 3 is what is left for zones the network does reach.
 
-A new road starts on the road tile closest to the city centre that has
-free land next to it, or on the free tile closest to the centre while
-there is no road, which happens once in a turn. It ends 6 tiles away in
-the first direction where the next tile is free and the end is free
-land, room for two zones along each side. `planRoute` finds the way
-there. Buildings and power line ends stay off the tile straight past the
-end of each road, so the roads can grow.
+A new road goes to land the agent can build on. Its end is the free
+tile next to an open zone site that no road touches yet, closest to the
+city centre: a 3 by 3 site of free land or plain power lines. It starts
+on the road tile closest to that end, and `planRoute` finds the way,
+bridges included. Once the road is there, the site touches it and the
+next turn can build a zone on it. When the route or its quote fails for
+a reason other than money, it tries the next end, up to 20 in a turn,
+since each try is a full route search. While there is no road at all,
+the first one starts on the free tile closest to the centre and runs 6
+tiles in the first direction where the next tile is free and the end is
+free land, once in a turn. Buildings and power line ends stay off the
+tile straight past the end of each road.
+
+In the first version every new road ended 6 tiles straight ahead of a
+road tile. Once the land near the town was used, or the town was on an
+island, those ends were all on water or taken land, and the agent
+stopped for good with money and demand left: on easy, seed 4 after turn
+19 and seed 6 after turn 159. A test checks that it now keeps building
+past those turns, and that in every turn with a positive demand it either
+acts or waits for money.
 
 Like any agent it only gives the two ends of a route, and the route
 comes from `planRoute`. The view does not change during a turn, so the
@@ -463,8 +476,11 @@ agent keeps the money and the tiles its earlier actions of the turn
 take, and the zones it has already wired. Its report in each turn of the
 log lists the rules it used and whether it waited for money.
 
-On maps where water and its own power lines close in the first streets,
-like seed 3 (islands) and seed 10, it can stop early with money left.
+It can still stop for good where its first road is closed in by zones
+and its own power lines, which a road cannot cross, as on seed 10. A
+road quoted at the start of a turn can also fail when it is applied, if
+a power line laid earlier in the same turn takes the tiles its route
+needed.
 
 ## Demo agent
 
