@@ -9,7 +9,8 @@ The headless runner must behave like micropolisJS in the browser. `src/`
 is only changed when something stops the game from running headless, as
 in changes 1 to 4 below. Game bugs, porting bugs from the original
 Micropolis included, are documented under "Known porting bugs" at the end
-and left as they are.
+and left as they are. The exception is a bug that removes part of what the
+experiment measures, like the crime scan in change 5.
 
 ## Engine changes
 
@@ -74,9 +75,52 @@ a budget waiting for input, then calls `_simulate` and `_updateTime`
 directly. It is a new method, so `simTick`, `_simFrame` and the browser
 loop are unchanged.
 
+### 5. src/blockMapUtils.js: the crime scan never ran
+
+`crimeScan` looped to `crimeRateMap.mapWidth` and `crimeRateMap.mapHeight`.
+`BlockMap` in `src/blockMap.ts` has no such fields. It has `gameMapWidth`
+and `gameMapHeight`, so both limits were `undefined`, the loop never ran
+and `census.crimeAverage` stayed 0. No city had any crime, police stations
+did nothing, and crime never lowered land value. The loop now uses
+`gameMapWidth` and `gameMapHeight`, as `getTrafficAverage` in
+`src/evaluation.js` already does.
+
+The same loop read the police map after two of its three smoothing passes.
+`crimeScan` smooths `policeStationMap` into `policeStationEffectMap` and
+back, three passes in all, so the result of the third is in
+`policeStationEffectMap`. The loop now subtracts that one. The original
+smooths `PoliceMap` in place three times and uses the result, `s_scan.c`
+lines 307 to 320:
+
+```c
+  SmoothPSMap();
+  SmoothPSMap();
+  SmoothPSMap();
+  totz = 0;
+  numz = 0;
+  cmax = 0;
+  for (x = 0; x < HWLDX; x++)
+    for (y = 0; y < HWLDY; y++) {
+      if (z = LandValueMem[x][y]) {
+	++numz;
+	z = 128 - z;
+	z += PopDensity[x][y];
+	if (z > 300) z = 300;
+	z -= PoliceMap[x >>2][y >>2];
+```
+
+`crimeScan` in MicropolisCore (`scan.cpp`) does the same. The original also
+keeps the block with the most crime (`CrimeMaxX` and `CrimeMaxY`) and
+draws a random number on ties. Nothing in the simulation reads it and the
+port never had it, so I left it out.
+
+In the developed test city crime is now 13 or 14 in the first two years,
+and 11 with a police station on the site of one of its zones.
+`headless/test/crime.test.ts` checks both.
+
 ## Configuration changes
 
-### 5. tsconfig.json: `include` limited to src/ and test/
+### 6. tsconfig.json: `include` limited to src/ and test/
 
 Commit `3120301`.
 
@@ -89,7 +133,7 @@ moved away the build worked, with only the bundle size warnings it already
 had. Limiting `include` to `src/` and `test/` fixed it without affecting
 the build or Jest.
 
-### 6. jest.config.js renamed to jest.config.cjs
+### 7. jest.config.js renamed to jest.config.cjs
 
 Commit `9fa0f34`.
 

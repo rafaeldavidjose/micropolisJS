@@ -686,8 +686,10 @@ The engine computes its seven problem values only during the yearly
 evaluation and keeps them in a private array in `src/evaluation.js`.
 `getState` recomputes them from the current census with the same formulas.
 Crime, pollution, housing and taxes come straight from census and budget
-fields. Unemployment and fire severity are copies of two private one line
-functions in `evaluation.js`. Traffic is the exception. It is the value
+fields. Crime used to be 0 in every city, because of a porting bug fixed
+in change 5 of `CHANGES.md`. Unemployment and fire severity are copies of
+two private one line functions in `evaluation.js`. Traffic is the
+exception. It is the value
 from the last yearly evaluation of a city with population, and it is not
 saved. For an empty city, and after a load until the next such
 evaluation, it reads 0.
@@ -811,6 +813,12 @@ Planes never collide. An explosion lights only its own tile instead of
 that tile and the four diagonal neighbours. Ships wreck on land with
 disasters off. Fire never spreads. And a burning or flooded zone marks
 the wrong tiles bulldozable.
+
+Crime was always 0, because the crime scan never ran. That bug is fixed,
+as an exception to the rule for `src/`, since it removed one of the seven
+problems (`CHANGES.md`, change 5). A city now has crime where land value is
+low and the population dense, police stations lower it, and crime above
+190 lowers land value.
 
 In `src/evaluation.js`, every yearly evaluation of a city with population
 adds 7 entries to a module level array that is never cleared. The array is
