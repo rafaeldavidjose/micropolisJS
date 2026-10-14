@@ -25,6 +25,7 @@ const FILES: Record<string, [string, string]> = {
   '/viewer.js': [join(VIEWER, 'viewer.js'), 'text/javascript; charset=utf-8'],
   '/replay.js': [join(VIEWER, 'replay.js'), 'text/javascript; charset=utf-8'],
   '/tiles.js': [join(VIEWER, 'tiles.js'), 'text/javascript; charset=utf-8'],
+  '/help.js': [join(VIEWER, 'help.js'), 'text/javascript; charset=utf-8'],
   '/tiles.png': [join(HERE, '..', 'images', 'tiles.png'), 'image/png'],
   '/sprites.png': [join(HERE, '..', 'images', 'sprites.png'), 'image/png'],
 };

@@ -104,7 +104,7 @@
           aria-labelledby="inspector-title">
         <header class="panel-head">
           <h2 id="inspector-title">Inspector</h2>
-          <span id="date" class="meta"></span>
+          <span id="date" class="meta" data-help="date" tabindex="0"></span>
         </header>
         <details open>
           <summary>State</summary>
@@ -179,9 +179,18 @@
         <canvas id="tracks" class="tracks" role="img"
             aria-label="Actions per turn, population and funds over the game. Click or drag to jump to a turn."></canvas>
         <div id="track-tip" class="track-tip" hidden></div>
+        <span id="help-actions" class="lane-help" data-help="actionsTrack"
+            tabindex="0" aria-label="Actions track" hidden></span>
+        <span id="help-population" class="lane-help"
+            data-help="populationTrack" tabindex="0"
+            aria-label="Population track" hidden></span>
+        <span id="help-funds" class="lane-help" data-help="fundsTrack"
+            tabindex="0" aria-label="Funds track" hidden></span>
       </div>
     </section>
   </main>
+
+  <div id="help-tip" class="help-tip" role="tooltip" hidden></div>
 
   <script type="module" src="viewer.js"></script>
 </body>

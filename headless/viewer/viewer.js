@@ -19,6 +19,7 @@ import {
   isUnpoweredZone,
   tileIndex,
 } from './tiles.js';
+import { HELP, REPORT_HELP } from './help.js';
 
 /**
  * @import { ActionResult, AppliedAction, CityDate, CityState, GameAction,
@@ -134,6 +135,18 @@ const tracks = byId('tracks');
 const workspace = byId('workspace');
 /** @type {HTMLInputElement} */
 const fileInput = byId('file');
+/** @type {HTMLElement} */
+const helpTip = byId('help-tip');
+/**
+ * The help targets over the names of the three tracks, which are drawn on
+ * the canvas.
+ * @type {[string, Lane, HTMLElement][]}
+ */
+const LANE_HELP = [
+  ['ACTIONS', LANES.actions, byId('help-actions')],
+  ['POPULATION', LANES.population, byId('help-population')],
+  ['FUNDS', LANES.funds, byId('help-funds')],
+];
 /** @type {MediaQueryList} */
 const narrow = window.matchMedia('(max-width: 1199px)');
 /** @type {MediaQueryList} */
@@ -231,6 +244,8 @@ let showAfter = false;
 let markPower = true;
 /** @type {boolean} */
 let showSprites = true;
+/** @type {HTMLElement | null} */
+let helpTarget = null;
 
 /**
  * @param {string} tag
@@ -464,10 +479,14 @@ function setPosition(target) {
     showMessage('');
   }
 
+  /** @type {{ key: string, focused: boolean } | null} */
+  const help = openHelp();
+
   showActions();
   showState();
   refreshMap();
   drawTracks();
+  reopenHelp(help);
 }
 
 /**
@@ -1080,9 +1099,10 @@ function showActions() {
  * @param {number} max
  * @param {string} color
  * @param {boolean} centred
+ * @param {string} help
  * @returns {HTMLElement[]}
  */
-function bar(name, value, max, color, centred) {
+function bar(name, value, max, color, centred, help) {
   /** @type {HTMLElement} */
   const track = element('div', '', 'bar' + (centred ? ' centred' : ''));
   /** @type {HTMLElement} */
@@ -1100,18 +1120,143 @@ function bar(name, value, max, color, centred) {
 
   fill.style.background = color;
   track.append(fill);
-  return [element('span', name), track,
+  return [withHelp(element('span', name), help), track,
     element('span', formatNumber(value), 'value')];
 }
 
 /**
- * @param {[string, string][]} rows
+ * @param {[string, string, string][]} rows name, value and help key
  * @returns {HTMLElement[]}
  */
 function keyValues(rows) {
   return rows.flatMap(
-    /** @param {[string, string]} row @returns {HTMLElement[]} */
-    ([name, value]) => [element('dt', name), element('dd', value)]);
+    /** @param {[string, string, string]} row @returns {HTMLElement[]} */
+    ([name, value, help]) =>
+      [withHelp(element('dt', name), help), element('dd', value)]);
+}
+
+/**
+ * Gives an element the explanation in help.js under a key, and lets the
+ * keyboard reach it.
+ * @param {HTMLElement} node
+ * @param {string} key
+ * @returns {HTMLElement}
+ */
+function withHelp(node, key) {
+  node.dataset.help = key;
+  node.tabIndex = 0;
+  return node;
+}
+
+/**
+ * The fields of an agent report have keys like report.draws. A field the
+ * help has no text for gets the general one.
+ * @param {string} key
+ * @returns {string}
+ */
+function helpText(key) {
+  if (key.startsWith('report.')) {
+    return REPORT_HELP[key.slice('report.'.length)] ?? HELP.report;
+  }
+
+  return HELP[key] ?? '';
+}
+
+/**
+ * @param {EventTarget | null} target
+ * @returns {HTMLElement | null}
+ */
+function helpOwner(target) {
+  return target instanceof Element ?
+    /** @type {HTMLElement | null} */ (target.closest('[data-help]')) : null;
+}
+
+/**
+ * Puts the tip under its target, or above it when there is no room below,
+ * and keeps it inside the window.
+ * @returns {void}
+ */
+function placeHelp() {
+  /** @type {DOMRect} */
+  const target = helpTarget.getBoundingClientRect();
+  /** @type {number} */
+  const width = document.documentElement.clientWidth;
+  /** @type {number} */
+  const height = document.documentElement.clientHeight;
+  /** @type {number} */
+  const below = target.bottom + 6;
+  /** @type {number} */
+  const above = target.top - helpTip.offsetHeight - 6;
+
+  helpTip.style.left = clamp(target.left, 8,
+    width - helpTip.offsetWidth - 8) + 'px';
+  helpTip.style.top = (below + helpTip.offsetHeight <= height - 8 ||
+    above < 8 ? below : above) + 'px';
+}
+
+/**
+ * @param {HTMLElement} target
+ * @returns {void}
+ */
+function showHelp(target) {
+  if (helpTarget !== null && helpTarget !== target) {
+    helpTarget.removeAttribute('aria-describedby');
+  }
+
+  helpTarget = target;
+  helpTip.textContent = helpText(target.dataset.help);
+  helpTip.hidden = false;
+  target.setAttribute('aria-describedby', 'help-tip');
+  placeHelp();
+}
+
+/**
+ * @returns {void}
+ */
+function hideHelp() {
+  if (helpTarget !== null) {
+    helpTarget.removeAttribute('aria-describedby');
+  }
+
+  helpTarget = null;
+  helpTip.hidden = true;
+}
+
+/**
+ * The inspector is built again at every step. The open tip is noted
+ * before, so reopenHelp can show it on the new element of the same metric
+ * and give that element the focus back.
+ * @returns {{ key: string, focused: boolean } | null}
+ */
+function openHelp() {
+  return helpTarget === null ? null : {
+    key: helpTarget.dataset.help,
+    focused: helpTarget === document.activeElement,
+  };
+}
+
+/**
+ * @param {{ key: string, focused: boolean } | null} help
+ * @returns {void}
+ */
+function reopenHelp(help) {
+  if (help === null) {
+    return;
+  }
+
+  /** @type {HTMLElement | null} */
+  const replacement = document.querySelector(`[data-help="${help.key}"]`);
+
+  if (replacement === null) {
+    hideHelp();
+    return;
+  }
+
+  if (help.focused && document.activeElement !== replacement) {
+    replacement.focus({ preventScroll: true });
+  }
+
+  showHelp(replacement);
 }
 
 /**
@@ -1128,28 +1273,32 @@ function showState() {
   byId('date').textContent = formatDate(state.date) +
     (position < run.log.turns.length ? ' · start of turn' : ' · end');
   byId('state').replaceChildren(...keyValues([
-    ['Funds', formatMoney(state.funds)],
-    ['Population', formatNumber(state.population)],
-    ['Score', formatNumber(state.score)],
+    ['Funds', formatMoney(state.funds), 'funds'],
+    ['Population', formatNumber(state.population), 'population'],
+    ['Score', formatNumber(state.score), 'score'],
     ['City class', state.cityClass.charAt(0) +
-      state.cityClass.slice(1).toLowerCase()],
-    ['Approval', state.approval + '%'],
-    ['Tax rate', state.taxRate + '%'],
-    ['Powered zones', `${state.poweredZoneCount} of ${zones}`],
+      state.cityClass.slice(1).toLowerCase(), 'cityClass'],
+    ['Approval', state.approval + '%', 'approval'],
+    ['Tax rate', state.taxRate + '%', 'taxRate'],
+    ['Powered zones', `${state.poweredZoneCount} of ${zones}`,
+      'poweredZones'],
   ]));
 
   // The valves run from -2000 to 2000 for residential, 1500 for the others
   byId('rci').replaceChildren(
-    ...bar('Residential', state.rci.residential, 2000, 'var(--res)', true),
-    ...bar('Commercial', state.rci.commercial, 1500, 'var(--com)', true),
-    ...bar('Industrial', state.rci.industrial, 1500, 'var(--ind)', true));
+    ...bar('Residential', state.rci.residential, 2000, 'var(--res)', true,
+      'residential'),
+    ...bar('Commercial', state.rci.commercial, 1500, 'var(--com)', true,
+      'commercial'),
+    ...bar('Industrial', state.rci.industrial, 1500, 'var(--ind)', true,
+      'industrial'));
   byId('problems').replaceChildren(...PROBLEMS.flatMap(
     /**
      * @param {[keyof CityState['problems'], string]} problem
      * @returns {HTMLElement[]}
      */
     ([key, name]) =>
-      bar(name, state.problems[key], 255, 'var(--problem)', false)));
+      bar(name, state.problems[key], 255, 'var(--problem)', false, key)));
 
   /** @type {HTMLElement} */
   const windows = byId('windows');
@@ -1162,8 +1311,9 @@ function showState() {
     const list = element('ul', '', 'windows');
 
     box.open = true;
-    box.append(element('summary',
-      `Budget windows (${turn.budgetWindows.length})`), list);
+    box.append(withHelp(element('summary',
+      `Budget windows (${turn.budgetWindows.length})`), 'budgetWindows'),
+      list);
 
     for (const record of turn.budgetWindows) {
       list.append(element('li', `${formatDate(record.date)}: funds ` +
@@ -1175,13 +1325,17 @@ function showState() {
     windows.append(box);
   }
 
-  /** @type {[string, string][]} */
+  /** @type {[string, string, string][]} */
   const report = turn !== null && turn.agent !== null ?
     Object.entries(turn.agent).map(
-      /** @param {[string, unknown]} entry @returns {[string, string]} */
+      /**
+       * @param {[string, unknown]} entry
+       * @returns {[string, string, string]}
+       */
       ([name, value]) => [name,
-        typeof value === 'object' ? JSON.stringify(value) : String(value)]) :
-    [['report', 'none']];
+        typeof value === 'object' ? JSON.stringify(value) : String(value),
+        'report.' + name]) :
+    [['report', 'none', 'report']];
   byId('report').replaceChildren(...keyValues(report));
 }
 
@@ -1298,6 +1452,10 @@ function drawTracks() {
   context.clearRect(0, 0, width, height);
 
   if (run === null) {
+    for (const [, , target] of LANE_HELP) {
+      target.hidden = true;
+    }
+
     return;
   }
 
@@ -1360,6 +1518,7 @@ function drawTracks() {
     width);
   laneLabel(context, LANES.funds, 'FUNDS', formatMoney(run.funds[position]),
     'max ' + formatMoney(funds), width);
+  placeLaneHelp(context);
 
   drawYears(context, width, height);
 
@@ -1378,6 +1537,21 @@ function drawTracks() {
     context.lineTo(Math.round(trackX(trackHover, width)) + 0.5, AXIS_TOP);
     context.stroke();
     context.setLineDash([]);
+  }
+}
+
+/**
+ * Puts the help targets of the three tracks over their names.
+ * @param {CanvasRenderingContext2D} context
+ * @returns {void}
+ */
+function placeLaneHelp(context) {
+  for (const [name, lane, target] of LANE_HELP) {
+    target.hidden = false;
+    target.style.left = tracks.offsetLeft + TRACK_PAD + 'px';
+    target.style.top = tracks.offsetTop + lane.top + 'px';
+    target.style.width = Math.ceil(context.measureText(name).width) + 4 +
+      'px';
   }
 }
 
@@ -1868,6 +2042,77 @@ document.addEventListener('drop',
     openFile(event.dataTransfer.files[0]);
   }
 });
+
+// A tip shows on hover, on keyboard focus and on a tap
+document.addEventListener('pointerover',
+  /** @param {PointerEvent} event @returns {void} */ (event) => {
+  /** @type {HTMLElement | null} */
+  const target = helpOwner(event.target);
+
+  if (event.pointerType !== 'touch' && target !== null) {
+    showHelp(target);
+  }
+});
+
+document.addEventListener('pointerout',
+  /** @param {PointerEvent} event @returns {void} */ (event) => {
+  /** @type {HTMLElement | null} */
+  const target = helpOwner(event.target);
+
+  if (event.pointerType !== 'touch' && target !== null &&
+      target === helpTarget && target !== document.activeElement &&
+      helpOwner(event.relatedTarget) !== target) {
+    hideHelp();
+  }
+});
+
+document.addEventListener('pointerup',
+  /** @param {PointerEvent} event @returns {void} */ (event) => {
+  /** @type {HTMLElement | null} */
+  const target = helpOwner(event.target);
+
+  if (event.pointerType !== 'touch') {
+    return;
+  }
+
+  if (target !== null) {
+    showHelp(target);
+  } else if (helpTarget !== null) {
+    hideHelp();
+  }
+});
+
+document.addEventListener('focusin',
+  /** @param {FocusEvent} event @returns {void} */ (event) => {
+  /** @type {HTMLElement | null} */
+  const target = helpOwner(event.target);
+
+  if (target !== null) {
+    showHelp(target);
+  }
+});
+
+// A step that rebuilds the inspector reopens the tip with reopenHelp
+document.addEventListener('focusout',
+  /** @param {FocusEvent} event @returns {void} */ (event) => {
+  if (helpOwner(event.target) === helpTarget) {
+    hideHelp();
+  }
+});
+
+document.addEventListener('keydown',
+  /** @param {KeyboardEvent} event @returns {void} */ (event) => {
+  if (event.key === 'Escape') {
+    hideHelp();
+  }
+});
+
+// The panels scroll, so the tip follows its target
+document.addEventListener('scroll', /** @returns {void} */ () => {
+  if (helpTarget !== null) {
+    placeHelp();
+  }
+}, true);
 
 new ResizeObserver(resize).observe(canvas);
 new ResizeObserver(drawTracks).observe(tracks);

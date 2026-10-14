@@ -696,6 +696,34 @@ details[open] > summary::before {
   pointer-events: none;
 }
 
+/* Explanations of the metrics, from viewer/help.js */
+
+[data-help] {
+  cursor: help;
+  text-decoration: underline dotted var(--fg-muted);
+  text-underline-offset: 3px;
+}
+
+.lane-help {
+  position: absolute;
+  height: 15px;
+  border-bottom: 1px dotted var(--fg-muted);
+}
+
+.help-tip {
+  position: fixed;
+  z-index: var(--z-tip);
+  max-width: min(300px, calc(100vw - 16px));
+  padding: 6px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  pointer-events: none;
+}
+
 /* Below 1200px: the map with a side panel of tabs */
 
 @media (max-width: 1199px) {

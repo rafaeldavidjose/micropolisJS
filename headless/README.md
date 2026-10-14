@@ -593,6 +593,15 @@ kind comes from the tile ranges of the query tool (`classifyZone` in
 like shore, bridge, traffic, empty zone, hospital or church, and the
 flags add the zone centre and the power.
 
+Every metric in the inspector, the date and the three tracks has a short
+explanation. It shows when the pointer is over the name, when the name
+has the keyboard focus, or on a tap on a touch screen, and Escape closes
+it. It says what the value is, its range and which way is better, when it
+changes, and what is easy to get wrong, like a negative unemployment or a
+score that halves. A dotted underline marks the names that have one. All
+the texts are in `viewer/help.js`, with a note on where in `src/` each
+fact comes from, so they are easy to correct.
+
 The sprites are drawn with `images/sprites.png`, the sprite sheet of the
 browser game, at the frame and place the log has. Stepping shows the
 sprites at the start of the turn, which are the last sample of the turn
@@ -702,9 +711,11 @@ census population to 1, so the extra evaluation on the first tick runs in
 full. With the test seed an empty city shows a score of 701 and approval
 63 until the first January.
 
-Score, approval and the problem values change once a year, at the
-evaluation in January. Population changes every month, because the
-monthly growth check recomputes it. That check also sets the change in
+Score and approval change once a year, at the evaluation in January, and
+so do the engine's own problem values, which the score and the vote use.
+The problem values `getState` recomputes from the census move during the
+year, all but traffic. Population changes every month, because the
+monthly growth check recomputes it, and the city class follows it there. That check also sets the change in
 population that the score uses, so the score sees the change over the last
 month, not over the year (see "Things to keep in mind").
 
