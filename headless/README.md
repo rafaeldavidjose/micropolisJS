@@ -738,8 +738,10 @@ years. That is why the developed city test exists. It places a coal plant,
 a road, zones on both sides and a power line with `build`, so growth,
 traffic, power and the budget run as well. The test also checks that the
 population grew, otherwise it would prove nothing. The developed city has
-disasters off. Its coal plant pushes average pollution above 60, and with
-disasters on a monster appears in month 28 and destroys the power supply.
+disasters off. Its coal plant pushes average pollution above 60, so with
+disasters on a monster can come and destroy the power supply. Before the
+traffic fix one came in month 28. Since then the random numbers run
+differently and none comes in the first 5 years.
 
 I also checked by hand that the same seed gives the same hash in two
 separate Node processes.
