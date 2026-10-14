@@ -78,6 +78,8 @@ loop are unchanged.
 
 ### 5. src/blockMapUtils.js: the crime scan never ran
 
+Commit `89b67ce`.
+
 `crimeScan` looped to `crimeRateMap.mapWidth` and `crimeRateMap.mapHeight`.
 `BlockMap` in `src/blockMap.ts` has no such fields. It has `gameMapWidth`
 and `gameMapHeight`, so both limits were `undefined`, the loop never ran
@@ -120,6 +122,8 @@ and 11 with a police station on the site of one of its zones.
 `headless/test/crime.test.ts` checks both.
 
 ### 6. src/traffic.js: no trip ever reached its destination
+
+Commit `3d78124`.
 
 `Traffic.tryDrive` had three errors from an upstream refactor in 2018
 (commit `d8fb7ce`, "Stop using bounds-checked positions"). It made its
