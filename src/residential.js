@@ -229,8 +229,8 @@ var residentialFound = function(map, x, y, simData) {
   // as the zone's population increases. Note: we will never execute this conditional if the zone is empty, as zero
   // will never be be bigger than any of the values Random will generate
   if (population > Random.getRandom(35)) {
-    // Is there a route from this zone to a commercial zone?
-    trafficOK = simData.trafficManager.makeTraffic(x, y, simData.blockMaps, TileUtils.isCommercial);
+    // Is there a route from this zone to shops, industry or a public building?
+    trafficOK = simData.trafficManager.makeTraffic(x, y, simData.blockMaps, Traffic.endsResidentialTrip);
 
     // If we're not connected to the road network, then going shopping will be a pain. Move out.
     if (trafficOK === Traffic.NO_ROAD_FOUND) {

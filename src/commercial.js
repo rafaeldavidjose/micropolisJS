@@ -90,8 +90,8 @@ var commercialFound = function(map, x, y, simData) {
   // Note in particular, we will never take this branch if the zone is empty.
   var trafficOK = Traffic.ROUTE_FOUND;
   if (population > Random.getRandom(5)) {
-    // Try to find a route from here to an industrial zone
-    trafficOK = simData.trafficManager.makeTraffic(x, y, simData.blockMaps, TileUtils.isIndustrial);
+    // Try to find a route from here to houses, shops or industry
+    trafficOK = simData.trafficManager.makeTraffic(x, y, simData.blockMaps, Traffic.endsCommercialTrip);
 
     // Trigger outward migration if not connected to road network
     if (trafficOK === Traffic.NO_ROAD_FOUND) {

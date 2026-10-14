@@ -41,20 +41,20 @@ test('budget window: the record has what the city could pay', (): void => {
   // Roads are paid first, then fire, then police
   assert.deepEqual(log[0], {
     date: { year: 1902, month: 0 },
-    funds: 512,
+    funds: 522,
     taxes: 19,
     fundsAfter: 0,
     road: 100,
-    fire: 41,
+    fire: 42,
     police: 0,
     autoBudgetWasOn: true,
   });
   assert.deepEqual(log[1], {
     date: { year: 1903, month: 0 },
     funds: 0,
-    taxes: 19,
+    taxes: 29,
     fundsAfter: 0,
-    road: 49,
+    road: 74,
     fire: 0,
     police: 0,
     autoBudgetWasOn: false,

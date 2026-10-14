@@ -646,11 +646,11 @@ returns the records.
 ```ts
 {
   date: { year: 1902, month: 0 },
-  funds: 512, // when the window opened, before taxes and spending
+  funds: 522, // when the window opened, before taxes and spending
   taxes: 19, // collected that January
   fundsAfter: 0,
   road: 100, // percent of full funding the city paid
-  fire: 41,
+  fire: 42,
   police: 0,
   autoBudgetWasOn: true,
 }
@@ -686,8 +686,8 @@ The engine computes its seven problem values only during the yearly
 evaluation and keeps them in a private array in `src/evaluation.js`.
 `getState` recomputes them from the current census with the same formulas.
 Crime, pollution, housing and taxes come straight from census and budget
-fields. Crime used to be 0 in every city, because of a porting bug fixed
-in change 5 of `CHANGES.md`. Unemployment and fire severity are copies of
+fields. Crime and traffic used to be 0 in every city, because of two
+porting bugs fixed in changes 5 and 6 of `CHANGES.md`. Unemployment and fire severity are copies of
 two private one line functions in `evaluation.js`. Traffic is the
 exception. It is the value
 from the last yearly evaluation of a city with population, and it is not
@@ -819,6 +819,12 @@ as an exception to the rule for `src/`, since it removed one of the seven
 problems (`CHANGES.md`, change 5). A city now has crime where land value is
 low and the population dense, police stations lower it, and crime above
 190 lowers land value.
+
+Traffic was always 0 as well, because no trip from a zone ever reached its
+destination. That is fixed for the same reason (`CHANGES.md`, change 6).
+Busy roads now get a traffic density. Their tiles show light or heavy
+traffic, heavy traffic counts double for road maintenance, traffic tiles
+add pollution, and the traffic problem is above 0.
 
 In `src/evaluation.js`, every yearly evaluation of a city with population
 adds 7 entries to a module level array that is never cleared. The array is

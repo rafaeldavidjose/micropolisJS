@@ -214,13 +214,13 @@ test('game: the log is written as JSON', async (): Promise<void> => {
   assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), log);
 });
 
-/* On hard with disasters on, a monster comes to the demo town on seed 5 in
- * the second turn. Reading the sprites must not change the run, so the
+/* On hard with disasters on, a monster comes to the demo town on seed 10
+ * in the fourth turn. Reading the sprites must not change the run, so the
  * city, the states and the game's next random number are the same. */
 test('game: recording sprites does not change the run',
   async (): Promise<void> => {
   const options: Partial<GameOptions> & { seed: number } = {
-    seed: 5, level: Simulation.LEVEL_HARD, disasters: true, turns: 6,
+    seed: 10, level: Simulation.LEVEL_HARD, disasters: true, turns: 6,
   };
   const recorded: RunLog = await runGame(createDemoAgent(), options);
   const recordedNext: number = Random.getRandom(1000000);

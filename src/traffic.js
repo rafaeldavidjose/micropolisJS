@@ -18,7 +18,7 @@ import { Random } from './random.ts';
 import { SPRITE_HELICOPTER } from './spriteConstants.ts';
 import { SpriteUtils } from './spriteUtils.js';
 import { TileUtils } from './tileUtils.js';
-import { DIRT, POWERBASE, ROADBASE } from "./tileValues.ts";
+import { COMBASE, DIRT, LHTHR, NUCLEAR, PORT, POWERBASE, ROADBASE } from "./tileValues.ts";
 
 function Traffic(map, spriteManager) {
   this._map = map;
@@ -102,17 +102,18 @@ var MAX_TRAFFIC_DISTANCE = 30;
 
 Traffic.prototype.tryDrive = function(startPos, destFn) {
   var dirLast;
-  var drivePos = new Position(startPos);
+  var drivePos = new Position(startPos.x, startPos.y);
 
   /* Maximum distance to try */
   for (var dist = 0; dist < MAX_TRAFFIC_DISTANCE; dist++) {
     var  dir = this.tryGo(drivePos, dirLast);
     if (dir) {
-      drivePos = Position.move(pos, dir);
+      drivePos = Position.move(drivePos, dir);
       dirLast = dir.oppositeDirection();
 
+      // Positions never change once made, so the stack can keep this one
       if (dist & 1)
-        this._stack.push(new Position(drivePos));
+        this._stack.push(drivePos);
 
       if (this.driveDone(drivePos, destFn))
         return true;
@@ -140,6 +141,8 @@ Traffic.prototype.tryGo = function(pos, dirLast) {
     if (dir != dirLast && TileUtils.isDriveable(this._map.getTileFromMapOrDefault(pos, dir, DIRT))) {
       directions.push(dir);
       count++;
+    } else {
+      directions.push(null);
     }
   });
 
@@ -147,12 +150,13 @@ Traffic.prototype.tryGo = function(pos, dirLast) {
     return;
   }
 
-  if (count === 1) {
-    return directions[0];
-  }
+  // Start from a random direction and take the first open one clockwise from it, as the original TryGo does. With
+  // only one open direction no random number is needed.
+  var i = count === 1 ? 0 : Random.getRandom16() & 3;
+  while (directions[i] === null)
+    i = (i + 1) & 3;
 
-  const index = Random.getRandom(directions.length - 1);
-  return directions[index];
+  return directions[i];
 };
 
 
@@ -178,6 +182,23 @@ Traffic.prototype.driveDone = function(pos, destFn) {
   }
 
   return false;
+};
+
+
+// Where a trip may end, by the kind of zone it starts from: next to any tile in these ranges, the TARGL and TARGH of
+// DriveDone in the original. A trip from a residential zone can end at industry or a power plant too.
+Traffic.endsResidentialTrip = function(tileValue) {
+  return tileValue >= COMBASE && tileValue <= NUCLEAR;
+};
+
+
+Traffic.endsCommercialTrip = function(tileValue) {
+  return tileValue >= LHTHR && tileValue <= PORT;
+};
+
+
+Traffic.endsIndustrialTrip = function(tileValue) {
+  return tileValue >= LHTHR && tileValue <= COMBASE;
 };
 
 

@@ -130,7 +130,7 @@ test('greedy agent: it keeps growing where it used to stop',
   async (): Promise<void> => {
   const cases: { seed: number; stoppedAfter: number; turns: number }[] = [
     { seed: 4, stoppedAfter: 19, turns: 40 },
-    { seed: 6, stoppedAfter: 159, turns: 175 },
+    { seed: 6, stoppedAfter: 159, turns: 200 },
   ];
 
   for (const { seed, stoppedAfter, turns } of cases) {

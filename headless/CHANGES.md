@@ -10,7 +10,8 @@ is only changed when something stops the game from running headless, as
 in changes 1 to 4 below. Game bugs, porting bugs from the original
 Micropolis included, are documented under "Known porting bugs" at the end
 and left as they are. The exception is a bug that removes part of what the
-experiment measures, like the crime scan in change 5.
+experiment measures, like the crime scan and the traffic in changes 5
+and 6.
 
 ## Engine changes
 
@@ -118,9 +119,88 @@ In the developed test city crime is now 13 or 14 in the first two years,
 and 11 with a police station on the site of one of its zones.
 `headless/test/crime.test.ts` checks both.
 
+### 6. src/traffic.js: no trip ever reached its destination
+
+`Traffic.tryDrive` had three errors from an upstream refactor in 2018
+(commit `d8fb7ce`, "Stop using bounds-checked positions"). It made its
+first position with `new Position(startPos)`, but the constructor takes
+`x` and `y`, so `x` was the start object and `y` was `undefined`. Every
+neighbour of that position was off the map, `tryGo` found no road, and the
+trip ended at once as `NO_ROUTE_FOUND`. Had a road been found,
+`Position.move(pos, dir)` would have thrown, since that function has no
+`pos`. And the positions saved along the way, `new Position(drivePos)`,
+had the first error again, so `addToTrafficDensityMap` would have skipped
+them all as off the map. So the traffic density map stayed empty, road
+tiles never showed traffic, and the traffic problem was always 0.
+`tryDrive` now copies the start's `x` and `y`, moves from `drivePos`, and
+saves `drivePos` itself, since a `Position` never changes once made.
+
+Two more differences in the same code kept trips from working like the
+original.
+
+Since upstream commit `a301c41` (2018), `tryGo` picked among the open
+directions with equal chances. The original starts at a random direction
+and takes the first open one clockwise from it, `s_traf.c` lines 224 to
+245:
+
+```c
+  rdir = Rand16() & 3;
+#endif
+  for (x = rdir; x < (rdir + 4); x++) {	/* for the 4 directions */
+    realdir = x & 3;
+    if (realdir == LDir) continue;	/* skip last direction */
+    if (RoadTest(GetFromMap(realdir))) {
+      MoveMapSim(realdir);
+      LDir = (realdir + 2) & 3;
+      if (z & 1)			/* save pos every other move */
+	PushPos();
+      return (TRUE);
+    }
+  }
+  return (FALSE);
+```
+
+The first version of the port did the same, and so does `tryGo` in
+MicropolisCore (`traffic.cpp`), which draws no random number when only
+one direction is open. `tryGo` does that again now.
+
+The zones also passed narrower destinations than the original. A trip
+from a residential zone could only end next to a commercial tile, one
+from a commercial zone next to an industrial tile, and one from an
+industrial zone next to a residential tile, empty zone tiles included. The
+original takes ranges of tile numbers, `s_traf.c` lines 277 and 278:
+
+```c
+  static short TARGL[3] = {COMBASE, LHTHR, LHTHR};
+  static short TARGH[3] = {NUCLEAR, PORT, COMBASE};	/* for destinations */
+```
+
+indexed by `MakeTraf(0)` for a residential zone, `MakeTraf(1)` for a
+commercial one and `MakeTraf(2)` for an industrial one (`s_zone.c` lines
+239, 200 and 169). A residential trip ends at shops, industry and every
+building up to the nuclear plant. A commercial trip ends at houses,
+hospitals, churches, shops, industry and the port. An industrial trip
+ends at houses, hospitals and churches. MicropolisCore has the same
+ranges. `Traffic.endsResidentialTrip`, `endsCommercialTrip` and
+`endsIndustrialTrip` hold them now, and `src/residential.js`,
+`src/commercial.js` and `src/industrial.js` pass them.
+
+`addToTrafficDensityMap` follows MicropolisCore and is unchanged. It caps
+the density at 240 every time and sends the helicopter in one case out of
+five. The original only caps it in that one case and lets it go past 240
+otherwise, which overflows its byte map.
+
+A zone still treats only "no road" as a failed trip, as in the original,
+so the fix does not change growth directly. It acts through the density.
+Busy road tiles show light and heavy traffic, heavy traffic counts double
+for road maintenance, traffic tiles add pollution, and the traffic problem
+is above 0. In the demo town on seed 1, 16 of its 44 road tiles show
+traffic after 10 years and the traffic problem is 26.
+`headless/test/traffic.test.ts` checks a trip and the density.
+
 ## Configuration changes
 
-### 6. tsconfig.json: `include` limited to src/ and test/
+### 7. tsconfig.json: `include` limited to src/ and test/
 
 Commit `3120301`.
 
@@ -133,7 +213,7 @@ moved away the build worked, with only the bundle size warnings it already
 had. Limiting `include` to `src/` and `test/` fixed it without affecting
 the build or Jest.
 
-### 7. jest.config.js renamed to jest.config.cjs
+### 8. jest.config.js renamed to jest.config.cjs
 
 Commit `9fa0f34`.
 
