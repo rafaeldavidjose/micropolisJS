@@ -27,7 +27,10 @@ import type {
   ActionResult,
   Agent,
   AppliedAction,
+  BlockMapLike,
+  BlockMapView,
   BudgetWindowRecord,
+  CityBlockMaps,
   CityView,
   GameAction,
   GameOptions,
@@ -46,7 +49,7 @@ import type {
   ZoneView,
 } from './types.ts';
 
-const LOG_VERSION: number = 3;
+const LOG_VERSION: number = 4;
 
 /* Sprites move 3 times per tick. A tornado moves about 2 pixels a move
  * and a train 4, so with a sample every time unit (16 ticks) a tornado
@@ -243,6 +246,45 @@ function readZones(map: MapLike): ZoneView[] {
   return zones;
 }
 
+/* A copy, so the agent can neither change the engine's map nor see it
+ * change after the turn. Off the grid it throws, like getTileValue. */
+function copyBlockMap(blockMap: BlockMapLike): BlockMapView {
+  const values: number[] = [];
+
+  for (let blockY: number = 0; blockY < blockMap.height; blockY++) {
+    for (let blockX: number = 0; blockX < blockMap.width; blockX++) {
+      values.push(blockMap.get(blockX, blockY));
+    }
+  }
+
+  return {
+    blockSize: blockMap.blockSize,
+    width: blockMap.width,
+    height: blockMap.height,
+    get: (blockX: number, blockY: number): number => {
+      if (!Number.isInteger(blockX) || !Number.isInteger(blockY) ||
+          blockX < 0 || blockY < 0 || blockX >= blockMap.width ||
+          blockY >= blockMap.height) {
+        throw new Error('Block ' + blockX + ', ' + blockY +
+          ' is off the map');
+      }
+
+      return values[blockY * blockMap.width + blockX];
+    },
+  };
+}
+
+// What the query tool reads for a tile (src/queryTool.js)
+function readBlockMaps(city: SimulationLike): CityBlockMaps {
+  return {
+    populationDensity: copyBlockMap(city.blockMaps.populationDensityMap),
+    landValue: copyBlockMap(city.blockMaps.landValueMap),
+    crime: copyBlockMap(city.blockMaps.crimeRateMap),
+    pollution: copyBlockMap(city.blockMaps.pollutionDensityMap),
+    growth: copyBlockMap(city.blockMaps.rateOfGrowthMap),
+  };
+}
+
 // Only reads the sprite list, so it draws no random number
 function readSprites(city: SimulationLike): SpriteRecord[] {
   return city.spriteManager.getSpriteList()
@@ -251,8 +293,8 @@ function readSprites(city: SimulationLike): SpriteRecord[] {
       sprite.x + sprite.xOffset, sprite.y + sprite.yOffset]);
 }
 
-function makeView(city: SimulationLike, turn: number,
-    maxActions: number): CityView {
+function makeView(city: SimulationLike, settings: GameOptions,
+    turn: number): CityView {
   const map: MapLike = getMap(city);
   const mapView: MapView = {
     width: map.width,
@@ -262,10 +304,12 @@ function makeView(city: SimulationLike, turn: number,
 
   return {
     turn: turn,
-    maxActions: maxActions,
+    maxActions: settings.maxActionsPerTurn,
+    level: settings.level,
     state: getState(city),
     map: mapView,
     zones: readZones(map),
+    blockMaps: readBlockMaps(city),
     budgetLog: getBudgetLog(city),
     quote: (action: GameAction): ActionResult => quoteAction(city, action),
     planRoute: (tool: string, from: Position, to: Position): RoutePlan =>
@@ -291,7 +335,7 @@ async function runGame(agent: Agent,
 
   for (let turn: number = 0; turn < settings.turns; turn++) {
     const tiles: number[] = settings.recordMap ? readTiles(map) : [];
-    const view: CityView = makeView(city, turn, settings.maxActionsPerTurn);
+    const view: CityView = makeView(city, settings, turn);
     const chosen: GameAction[] = await agent.decide(view);
     const actions: unknown[] = Array.isArray(chosen) ? chosen : [];
     const applied: AppliedAction[] = actions

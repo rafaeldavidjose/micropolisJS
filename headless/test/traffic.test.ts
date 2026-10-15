@@ -69,8 +69,9 @@ test('traffic: busy roads get a traffic density', async (): Promise<void> => {
   }
 
   const map: MapLike = getMap(city);
-  const density: DensityMap =
-    (city.blockMaps as { trafficDensityMap: DensityMap }).trafficDensityMap;
+  // Not one of the maps in BlockMapsLike, which only has the query tool's
+  const density: DensityMap = (city.blockMaps as unknown as
+    { trafficDensityMap: DensityMap }).trafficDensityMap;
   let busyRoads: number = 0;
   let trafficTiles: number = 0;
 

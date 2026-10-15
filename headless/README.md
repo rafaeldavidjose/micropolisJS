@@ -294,11 +294,14 @@ nothing. `decide` may return a promise, so an agent can wait for a
 language model. Optional `settings()` and `report()` methods add the
 agent's settings to the log, and something of its own to every turn.
 
-The view has `turn`, `maxActions`, `state` (from `getState`), `map` with
-`width`, `height` and `getTileValue(x, y)`, `zones`, the budget log so
-far, `quote(action)` and `planRoute(tool, from, to)`. Quotes and plans
-are made against the city at the start of the turn, before any of the
-agent's own actions.
+The view has `turn`, `maxActions`, `level`, `state` (from `getState`),
+`map` with `width`, `height` and `getTileValue(x, y)`, `zones`,
+`blockMaps`, the budget log so far, `quote(action)` and
+`planRoute(tool, from, to)`. Quotes and plans are made against the city
+at the start of the turn, before any of the agent's own actions. The
+level is the one of the run, which the browser shows in the evaluation
+window. An agent needs it to work out the yearly costs, since the road
+maintenance and the taxes depend on it.
 
 `getTileValue` gives the tile number without the flag bits, so the map
 alone does not say which zones have power. A player sees it in the
@@ -306,6 +309,32 @@ browser, where a lightning bolt blinks on the centre of every zone or
 building without power. `zones` gives every agent the same: a list of
 zone and building centres as `{ x, y, tile, powered }`, read from the
 zone and power flags of the centre tile.
+
+The original game has a map window with views of population density,
+rate of growth, traffic density, pollution, crime, land value and the
+fire and police radius (`sim.h` in SimHacker/micropolis). micropolisJS
+has none of them in the browser. What a player can see is the query
+tool: a click on a tile shows its zone and five values from the engine's
+block maps, each as one of four words (`src/queryTool.js`). `blockMaps`
+gives every agent those five maps, as copies taken at the start of the
+turn:
+
+- `populationDensity`, blocks of 2 by 2 tiles, 0 to about 510
+- `landValue`, 2 by 2, 1 to 250, and 0 where nothing is built
+- `crime`, 2 by 2, 0 to 250
+- `pollution`, 2 by 2, 0 to 255
+- `growth`, the rate of growth, 8 by 8, -200 to 200
+
+Each one has `blockSize`, `width` and `height` in blocks, and
+`get(blockX, blockY)`, which throws off the grid like `getTileValue`. The
+block of a tile is `Math.floor(x / blockSize)`. The browser shows the
+words only, and the raw values only in its debug mode, so the view gives
+a little more than a player sees. The maps of police and fire coverage
+and of traffic density are not in it, because the browser does not show
+them. Traffic shows on the road tiles themselves, which the map already
+has. At medium speed the scans that fill the maps run every 7 to 9 time
+units, so a map can be about two months old. The run log does not keep
+them.
 
 Actions are plain data, so an agent can write them as JSON:
 
@@ -366,7 +395,8 @@ the map. The sprites add 0 to 6 kB to a 20 year demo game with disasters
 on. Reading the list draws no random number, so recording does not change
 the run, which a test checks. `recordSprites: false` leaves them out.
 
-The log has a `version`, now 3. Version 2 logs had no sprites, and
+The log has a `version`, now 4. Version 3 logs had no funding, auto
+budget or effects in the state, version 2 logs also had no sprites, and
 version 1 logs also had tile numbers without the flags and no route
 tiles.
 
@@ -585,11 +615,14 @@ action in the list or on the map selects it, fades the others and brings
 it into view.
 
 The inspector has the state at the start of the turn: date, funds,
-population, score, city class, approval, tax rate, powered zones, RCI
-demand and the seven problems, then the budget windows answered during
-the turn and the agent's report. The status bar says what a tile is. The
-kind comes from the tile ranges of the query tool (`classifyZone` in
-`src/queryTool.js`). A detail is added where the tile number says more,
+population, score, city class, approval, tax rate, powered zones, then
+the budget settings (auto budget, the three funding shares and the three
+effects), RCI demand and the seven problems, then the budget windows
+answered during the turn and the agent's report. A log from before
+version 4 shows "not in this log" for the budget settings. The status
+bar says what a tile is. The kind comes from the tile ranges of the
+query tool (`classifyZone` in `src/queryTool.js`). A detail is added
+where the tile number says more,
 like shore, bridge, traffic, empty zone, hospital or church, and the
 flags add the zone centre and the power.
 
@@ -690,18 +723,29 @@ record of the log.
 - `problems`: the seven problem values, see below
 - `poweredZoneCount` and `unpoweredZoneCount`: from `_census`
 - `taxRate`: `budget.cityTax`
+- `funding`: `budget.roadPercent`, `firePercent` and `policePercent`
+- `autoBudget`: `budget.autoBudget`
+- `effects`: `budget.roadEffect`, `policeEffect` and `fireEffect`
+
+The engine keeps the funding as fractions from 0 to 1. `funding` gives
+whole percents, floored as the budget window shows them
+(`handleBudgetRequest` in `src/game.js`), so 0.29 reads 28. The effects
+are what the funding does: up to 32 for roads, and up to 1,000 for each
+police and fire station. `updateFundEffects` in `src/budget.js` sets them
+whenever the budget is paid or the funding changes. A road effect below
+30 lets roads decay, and the police and fire effects set how much each
+station adds to its coverage.
 
 The engine computes its seven problem values only during the yearly
 evaluation and keeps them in a private array in `src/evaluation.js`.
 `getState` recomputes them from the current census with the same formulas.
 Crime, pollution, housing and taxes come straight from census and budget
 fields. Crime and traffic used to be 0 in every city, because of two
-porting bugs fixed in changes 5 and 6 of `CHANGES.md`. Unemployment and fire severity are copies of
-two private one line functions in `evaluation.js`. Traffic is the
-exception. It is the value
-from the last yearly evaluation of a city with population, and it is not
-saved. For an empty city, and after a load until the next such
-evaluation, it reads 0.
+porting bugs fixed in changes 5 and 6 of `CHANGES.md`. Unemployment and
+fire severity are copies of two private one line functions in
+`evaluation.js`. Traffic is the exception. It is the value from the last
+yearly evaluation of a city with population, and it is not saved. For an
+empty city, and after a load until the next such evaluation, it reads 0.
 
 Approval and population are not saved either. Right after `loadCity` they
 read 0 until the first tick. For a city with no population the yearly
@@ -715,9 +759,10 @@ Score and approval change once a year, at the evaluation in January, and
 so do the engine's own problem values, which the score and the vote use.
 The problem values `getState` recomputes from the census move during the
 year, all but traffic. Population changes every month, because the
-monthly growth check recomputes it, and the city class follows it there. That check also sets the change in
-population that the score uses, so the score sees the change over the last
-month, not over the year (see "Things to keep in mind").
+monthly growth check recomputes it, and the city class follows it there.
+That check also sets the change in population that the score uses, so the
+score sees the change over the last month, not over the year (see
+"Things to keep in mind").
 
 `_valves`, `_census` and `_map` are private fields of the engine, and
 `_constructSimData` is a private method. The underscore is only a naming

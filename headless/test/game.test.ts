@@ -17,6 +17,8 @@ import type {
   ActionResult,
   Agent,
   AppliedAction,
+  BlockMapLike,
+  BlockMapView,
   CityView,
   GameAction,
   GameOptions,
@@ -60,6 +62,18 @@ function scriptedAgent(actions: unknown[]): Agent {
     decide: (view: CityView): GameAction[] =>
       view.turn === 0 ? actions as GameAction[] : [],
   };
+}
+
+function readBlocks(blockMap: BlockMapLike | BlockMapView): number[] {
+  const values: number[] = [];
+
+  for (let blockY: number = 0; blockY < blockMap.height; blockY++) {
+    for (let blockX: number = 0; blockX < blockMap.width; blockX++) {
+      values.push(blockMap.get(blockX, blockY));
+    }
+  }
+
+  return values;
 }
 
 function readTiles(map: MapLike): number[] {
@@ -271,4 +285,55 @@ test('game: the view lists every zone with its power',
   assert.ok(last.some((zone: ZoneView): boolean =>
     zone.tile === POWERPLANT && zone.powered));
   assert.ok(last.filter((zone: ZoneView): boolean => zone.powered).length > 5);
+});
+
+/* The view has the five block maps the query tool reads, copied at the
+ * start of the turn. Replaying the demo town to the start of its last turn
+ * gives the same values in the engine, which a live map would not. */
+test('game: the view has the block maps of the query tool',
+  async (): Promise<void> => {
+  const turns: number = 12;
+  const views: CityView[] = [];
+  const demo: Agent = createDemoAgent();
+  const watched: Agent = {
+    name: demo.name,
+    decide: (view: CityView): GameAction[] | Promise<GameAction[]> => {
+      views.push(view);
+      return demo.decide(view);
+    },
+  };
+  const log: RunLog = await runGame(watched, { seed: SEED, turns: turns });
+  const city: SimulationLike = createCity({
+    seed: SEED, level: log.options.level, disasters: log.options.disasters,
+  });
+
+  for (const turn of log.turns.slice(0, turns - 1)) {
+    for (const applied of turn.actions) {
+      applyAction(city, applied.action);
+    }
+
+    stepMonths(city, log.options.monthsPerTurn);
+  }
+
+  const view: CityView = views[turns - 1];
+  const pairs: [BlockMapView, BlockMapLike, number][] = [
+    [view.blockMaps.populationDensity, city.blockMaps.populationDensityMap,
+      2],
+    [view.blockMaps.landValue, city.blockMaps.landValueMap, 2],
+    [view.blockMaps.crime, city.blockMaps.crimeRateMap, 2],
+    [view.blockMaps.pollution, city.blockMaps.pollutionDensityMap, 2],
+    [view.blockMaps.growth, city.blockMaps.rateOfGrowthMap, 8],
+  ];
+
+  for (const [copy, engine, blockSize] of pairs) {
+    assert.equal(copy.blockSize, blockSize);
+    assert.equal(copy.width, Math.ceil(120 / blockSize));
+    assert.equal(copy.height, Math.ceil(100 / blockSize));
+    assert.deepEqual(readBlocks(copy), readBlocks(engine));
+    assert.ok(readBlocks(copy).some((value: number): boolean => value !== 0));
+  }
+
+  assert.equal(view.level, log.options.level);
+  assert.throws((): number => view.blockMaps.crime.get(-1, 0));
+  assert.throws((): number => view.blockMaps.growth.get(15, 0));
 });

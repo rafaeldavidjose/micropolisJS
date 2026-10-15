@@ -89,6 +89,12 @@ function getFireSeverity(census: CensusLike): number {
   return Math.min(census.firePop * 5, 255);
 }
 
+/* The budget window shows each percent floored to a whole number
+ * (handleBudgetRequest in src/game.js), so 0.29 shows as 28. */
+function wholePercent(fraction: number): number {
+  return Math.floor(fraction * 100);
+}
+
 function getState(city: SimulationLike): CityState {
   const census: CensusLike = getCensus(city);
   const valves: ValvesLike = getValves(city);
@@ -118,6 +124,17 @@ function getState(city: SimulationLike): CityState {
     poweredZoneCount: census.poweredZoneCount,
     unpoweredZoneCount: census.unpoweredZoneCount,
     taxRate: city.budget.cityTax,
+    funding: {
+      road: wholePercent(city.budget.roadPercent),
+      fire: wholePercent(city.budget.firePercent),
+      police: wholePercent(city.budget.policePercent),
+    },
+    autoBudget: city.budget.autoBudget,
+    effects: {
+      road: city.budget.roadEffect,
+      police: city.budget.policeEffect,
+      fire: city.budget.fireEffect,
+    },
   };
 }
 

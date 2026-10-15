@@ -36,6 +36,45 @@ const HELP = {
     'once a year, in January. A higher rate lowers the demand for all ' +
     'three zone types.',
 
+  /* The budget fields. budget.js: collectTax sets the full costs every
+   * January, _calculateBestPercentages lowers the shares, doBudgetNow
+   * turns auto budget off, updateFundEffects sets the effects. */
+  autoBudget: 'Whether the yearly budget pays by itself. With it on, ' +
+    'January pays roads, fire and police when some money is left after ' +
+    'paying. Otherwise the engine turns it off and opens the budget ' +
+    'window, and while it is off the window opens every January. Only a ' +
+    'player or an agent turns it back on.',
+  roadFunding: 'The share of full road and rail maintenance the city ' +
+    'pays, 0 to 100%, floored as the budget window shows it. Full ' +
+    'maintenance is $1 a road tile, $5 a bridge, $1 more for heavy ' +
+    'traffic and $2 a rail tile, times 0.7, 0.9 or 1.2 by level. After a ' +
+    'year without enough money the engine lowers it to what the city ' +
+    'could pay, and it stays there until someone raises it.',
+  fireFunding: 'The share of full fire station maintenance the city pays, ' +
+    '$100 a station a year, 0 to 100%. The engine lowers it like the road ' +
+    'share, and pays roads first, then fire, then police.',
+  policeFunding: 'The share of full police station maintenance the city ' +
+    'pays, $100 a station a year, 0 to 100%. The engine lowers it like ' +
+    'the road share, and police are paid last.',
+  roadEffect: 'How well roads are kept, 0 to 32: 32 × paid / full ' +
+    'maintenance, set when the budget is paid or the shares change. ' +
+    'Below 30, about 94% funding, road and rail tiles start to turn into ' +
+    'rubble and bridges into water. The score loses 32 minus this. A city ' +
+    'without population keeps 32.',
+  // emergencyServices.js, crimeScan and fireAnalysis in blockMapUtils.js
+  policeEffect: 'The strength of each police station, 0 to 1,000: 1,000 × ' +
+    'paid / full police maintenance. A station adds it to its block of 8 ' +
+    'by 8 tiles, halved without power and halved again without a road ' +
+    'next to it. Smoothed over the blocks around, it is taken off the ' +
+    'crime there.',
+  // miscTiles.js fireFound
+  fireEffect: 'The strength of each fire station, 0 to 1,000, worked out ' +
+    'like the police effect. Where the smoothed value is above 100, a ' +
+    'fire goes out with a chance of 1 in 2 on the one scan in four that ' +
+    'checks it, against 1 in 11 with no station near.',
+  budgetMissing: 'Logs written before version 4 have no funding shares, ' +
+    'auto budget or effects in the state.',
+
   // mapScanner.js counts them, evaluation.js getScore uses the share
   poweredZones: 'Zones and buildings with power, out of all of them, ' +
     'counted on every pass of the map scan. The score is multiplied by ' +

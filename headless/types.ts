@@ -13,7 +13,8 @@ interface CensusLike {
   unpoweredZoneCount: number;
 }
 
-// The three percents are fractions from 0 to 1 in the engine
+/* The three percents are fractions from 0 to 1 in the engine. The effects
+ * run up to 32 for roads and 1,000 for police and fire. */
 interface BudgetLike {
   awaitingValues: boolean;
   autoBudget: boolean;
@@ -22,6 +23,9 @@ interface BudgetLike {
   roadPercent: number;
   firePercent: number;
   policePercent: number;
+  roadEffect: number;
+  policeEffect: number;
+  fireEffect: number;
   taxFund: number;
   doBudgetWindow(): void;
   setTax(rate: number): void;
@@ -45,6 +49,23 @@ interface ValvesLike {
 
 interface DisasterManagerLike {
   disastersEnabled: boolean;
+}
+
+// One value for every blockSize by blockSize tiles, as in src/blockMap.ts
+interface BlockMapLike {
+  blockSize: number;
+  width: number;
+  height: number;
+  get(blockX: number, blockY: number): number;
+}
+
+// The block maps the query tool reads, the only ones headless/ uses
+interface BlockMapsLike {
+  populationDensityMap: BlockMapLike;
+  landValueMap: BlockMapLike;
+  crimeRateMap: BlockMapLike;
+  pollutionDensityMap: BlockMapLike;
+  rateOfGrowthMap: BlockMapLike;
 }
 
 // The raw value holds the tile number and its flags together
@@ -111,7 +132,7 @@ interface SimulationLike {
   evaluation: EvaluationLike;
   disasterManager: DisasterManagerLike;
   spriteManager: SpriteManagerLike;
-  blockMaps: unknown;
+  blockMaps: BlockMapsLike;
   getDate(): CityDate;
   forceTick(): void;
   setSpeed(speed: number): void;
@@ -256,14 +277,35 @@ interface ZoneView {
   powered: boolean;
 }
 
+/* A block map copied at the start of the turn. Blocks are counted from 0,
+ * 0 in the top left, and one covers blockSize by blockSize tiles. */
+interface BlockMapView {
+  blockSize: number;
+  width: number;
+  height: number;
+  get(blockX: number, blockY: number): number;
+}
+
+/* The five maps the query tool of the browser reads for a tile. It shows
+ * them as four levels each, here they are the engine's values. */
+interface CityBlockMaps {
+  populationDensity: BlockMapView;
+  landValue: BlockMapView;
+  crime: BlockMapView;
+  pollution: BlockMapView;
+  growth: BlockMapView;
+}
+
 /* What an agent sees at the start of a turn. Quotes and plans are made
  * against the city as it is then, before any of the agent's actions. */
 interface CityView {
   turn: number;
   maxActions: number;
+  level: number;
   state: CityState;
   map: MapView;
   zones: ZoneView[];
+  blockMaps: CityBlockMaps;
   budgetLog: BudgetWindowRecord[];
   quote(action: GameAction): ActionResult;
   planRoute(tool: string, from: Position, to: Position): RoutePlan;
@@ -372,6 +414,18 @@ interface CityState {
   poweredZoneCount: number;
   unpoweredZoneCount: number;
   taxRate: number;
+  // Whole percents, floored as the budget window of the browser shows them
+  funding: {
+    road: number;
+    fire: number;
+    police: number;
+  };
+  autoBudget: boolean;
+  effects: {
+    road: number;
+    police: number;
+    fire: number;
+  };
 }
 
 export type {
@@ -379,9 +433,12 @@ export type {
   ActionResult,
   Agent,
   AppliedAction,
+  BlockMapLike,
+  BlockMapView,
   BudgetPercentages,
   BudgetWindowRecord,
   CensusLike,
+  CityBlockMaps,
   CityDate,
   CityState,
   CityView,

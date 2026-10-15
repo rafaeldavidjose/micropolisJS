@@ -61,6 +61,31 @@ test('budget window: the record has what the city could pay', (): void => {
   });
 });
 
+/* The state shows the shares the engine wrote over the ones that were
+ * set, and the effects that follow from what was paid. */
+test('budget window: the state has the shares, auto budget and effects',
+  (): void => {
+  const city: SimulationLike = createPoorCity(SEED);
+  const before: CityState = getState(city);
+
+  assert.deepEqual(before.funding, { road: 100, fire: 100, police: 100 });
+  assert.equal(before.autoBudget, true);
+  assert.deepEqual(before.effects, { road: 32, police: 1000, fire: 1000 });
+
+  stepMonths(city, 12 * 3);
+
+  const after: CityState = getState(city);
+
+  assert.deepEqual(after.funding, { road: 74, fire: 0, police: 0 });
+  assert.equal(after.autoBudget, false);
+  assert.deepEqual(after.effects, {
+    road: city.budget.roadEffect,
+    police: 0,
+    fire: 0,
+  });
+  assert.ok(after.effects.road > 0 && after.effects.road < 30);
+});
+
 test('budget window: the engine leaves auto budget off afterwards',
   (): void => {
   const city: SimulationLike = createPoorCity(SEED);

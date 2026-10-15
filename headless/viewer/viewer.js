@@ -1260,6 +1260,32 @@ function reopenHelp(help) {
 }
 
 /**
+ * Logs before version 4 have no funding, auto budget or effects.
+ * @param {CityState} state
+ * @returns {void}
+ */
+function showBudget(state) {
+  if (state.funding === undefined) {
+    byId('budget').replaceChildren(...keyValues([
+      ['Budget', 'not in this log', 'budgetMissing'],
+    ]));
+    return;
+  }
+
+  byId('budget').replaceChildren(...keyValues([
+    ['Auto budget', state.autoBudget ? 'On' : 'Off', 'autoBudget'],
+    ['Road funding', state.funding.road + '%', 'roadFunding'],
+    ['Fire funding', state.funding.fire + '%', 'fireFunding'],
+    ['Police funding', state.funding.police + '%', 'policeFunding'],
+    ['Road effect', `${state.effects.road} of 32`, 'roadEffect'],
+    ['Police effect', `${formatNumber(state.effects.police)} of 1,000`,
+      'policeEffect'],
+    ['Fire effect', `${formatNumber(state.effects.fire)} of 1,000`,
+      'fireEffect'],
+  ]));
+}
+
+/**
  * @returns {void}
  */
 function showState() {
@@ -1283,6 +1309,7 @@ function showState() {
     ['Powered zones', `${state.poweredZoneCount} of ${zones}`,
       'poweredZones'],
   ]));
+  showBudget(state);
 
   // The valves run from -2000 to 2000 for residential, 1500 for the others
   byId('rci').replaceChildren(
