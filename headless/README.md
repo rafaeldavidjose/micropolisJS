@@ -625,10 +625,10 @@ objective by less than the noise, 2.75 with it against 2.79 without.
 
 The 75 months come from the 20 year games of the greedy agent, which
 this agent replaced, after the crime and traffic fixes, seeds 1 to 10,
-on hard with disasters and on easy without. Of the 3,213 times an empty zone with power and a road went on
-to develop, half did so within a year, 90% within 4.5 years, 95% within
-75 months and 99% within 10.5 years. Another 888 zones were still empty
-at the end of a game.
+on hard with disasters and on easy without. Of the 3,213 times an empty
+zone with power and a road went on to develop, half did so within a
+year, 90% within 4.5 years, 95% within 75 months and 99% within 10.5
+years. Another 888 zones were still empty at the end of a game.
 
 All thresholds and margins are named constants at the top of
 `agents/rules.ts` and are provisional. They were tuned on seeds 1001 to
@@ -654,7 +654,14 @@ of growing funds, 1.58 for the first rule, 2.07 for a fixed 5%, 1.17 for
 the rule that holds 5% until the budget runs at a loss, 2.15 for the
 base rule with 6% on hard and 2.78 with 5% on hard. On easy the rule
 that waits for growing funds and the base rule did best, about 30,000
-people against 27,900 for a fixed 5%.
+people against 27,900 for a fixed 5%. Three more rules were tried and
+left out, since none scored better: a limit on the empty zones of a type
+before zoning more of it, from 1 to 20 (1.06 to 2.75), and cutting police
+and fire funding while the city is broke and at a loss (2.53 to 2.66).
+The third power rule turned out to build its plant when it should. The
+engine's power scan counts about 1.5 steps per tile, since it comes back
+to every tile where the network branches, so a coal plant runs short at
+about 450 to 500 tiles, not 700.
 
 Ties and orders are fixed. Distances are straight lines, and ties go to
 the tile higher up the map, then to the one further left. Directions are
@@ -670,29 +677,25 @@ wired and the sites it has used. A road quoted at the start of a turn
 can still fail when it is applied, if a power line laid earlier in the
 same turn takes the tiles its route needed.
 
-In a sanity run on seeds 1 to 10, 20 years each, with fire spreading,
-the painting and this tax rule, the agent ended with 3,892 people on
-average on hard with disasters, against 7,848 with the first tax rule
-and before the two engine changes, and with 27,782 on easy without
-disasters, against 28,504. Budget windows opened in 97 years on hard and
-in none on easy, and no action failed.
+In the third sanity run on seeds 1 to 10, 20 years each, with the base
+tax rule and the fire emergency, the agent ended with 13,736 people on
+average on hard with disasters, against 3,892 in the second run and
+7,848 in the first. On easy without disasters it ended with 27,782, the
+same as in the second run: there the base is the 7% a city starts with,
+and no fire happens, so the games are the same. Budget windows opened in
+97 years on hard and in none on easy, and no action failed. 218 of the
+559 zones on hard were empty at the end, against 426 of 607 in the
+second run, so the empty zones came from the high tax.
 
-The hard cities stay small for three reasons. On hard the yearly budget
-loses money every year until about 1913, $66 to $309 on average, because
-road upkeep is 1.2 times its base cost there against 0.7 on easy, and
-taxes 0.8 times against 1.4. So the $20,000 of a new city pays for
-everything and is gone by 1907 to 1911. The level is also added to the tax rate when the demand
-valves look up the tax table (`src/valves.js`), so on hard a rate of 7%
-takes 40 off all three demands twice a month, and 9% takes 150, where 5%
-takes nothing. With this tax rule the rate stays at 7% while the start
-money lasts, and then goes up to 9% because the city cannot pay, so
-demand collapses and the cities lose about half of their people after
-their peak around 1909. The first tax rule cut the rate to 5% in the
-first two years, which is why its cities were twice as big. And the
-agent zones more than demand fills: at the end 426 of the 607 zones on
-hard were empty, against 198 of 771 on easy. On seed 5 a fire spread
-through the town from 1908 to the end, with no money for a fire station,
-and the city ended empty.
+The cities still run out of money. On hard the yearly budget loses money
+until the towns are big enough, because road upkeep there is 1.2 times
+its base cost against 0.7 on easy, and taxes 0.8 times against 1.4. The
+$20,000 of a new city is gone by 1907 to 1910, and from then on the agent
+plays nothing in 35 to 40 of the 40 turns of the second half of a game,
+while its zones keep filling. The two smallest hard cities, with 2,240
+and 3,040 people, were hit by monsters, which come because the coal
+plant pushes average pollution above 60. One of them lost its plant
+twice in its first two years.
 
 This agent replaced the greedy agent, which only had the power and the
 growth rules and ignored crime, fire, taxes and the budget. Git history
