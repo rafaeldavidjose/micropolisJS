@@ -78,10 +78,11 @@ const CRIME_THRESHOLD: number = 50;
 const COVERAGE_RADIUS: number = 12;
 
 // A fire station is built where it covers at least this many blocks
-const FIRE_MIN_BLOCKS: number = 80;
+const FIRE_MIN_BLOCKS: number = 60;
 
-// Money above the reserve that counts as piling up
-const PILE_UP_FUNDS: number = 10000;
+/* Money piles up when the funds grew over the last year and stayed at
+ * least this far above the reserve all the time. */
+const PILE_UP_MARGIN: number = 0;
 
 // Taxes count as among the worst when in this many of the seven problems
 const WORST_PROBLEMS: number = 3;
@@ -138,14 +139,23 @@ const POLLUTER_TOOLS: readonly string[] = [
   'airport',
 ];
 
+// The funds and the reserve at the start of a turn
+interface FundsRecord {
+  month: number;
+  funds: number;
+  reserve: number;
+}
+
 /* What the agent keeps from turn to turn: the road tiles it has seen, when
  * each empty zone with power and a road was first seen like that, the
- * sites it bulldozed for another zone, and when it last changed the tax. */
+ * sites it bulldozed for another zone, when it last changed the tax, and
+ * its funds over the last year. */
 interface Memory {
   roads: Set<number>;
   emptySince: Map<number, number>;
   rezone: Set<number>;
   lastTaxChange: number;
+  funds: FundsRecord[];
 }
 
 // A zone or building by its site, and whether it is a home or pollutes
@@ -939,6 +949,33 @@ function cannotPay(view: CityView, plan: TurnPlan, counts: Census): boolean {
     plan.funds + expectedTaxes(view, counts) < yearlyCost(view);
 }
 
+/* Keeps the funds of this turn and drops what is older than the last turn
+ * at least a year ago. */
+function rememberFunds(memory: Memory, plan: TurnPlan): void {
+  memory.funds.push({
+    month: plan.month,
+    funds: plan.funds,
+    reserve: plan.reserve,
+  });
+
+  while (memory.funds.length > 1 &&
+      memory.funds[1].month <= plan.month - 12) {
+    memory.funds.shift();
+  }
+}
+
+/* Money piles up when the funds are higher than a year ago and stayed
+ * PILE_UP_MARGIN above the reserve in every turn since. The money a new
+ * city starts with does not count: it has no year behind it. */
+function moneyPilesUp(memory: Memory, plan: TurnPlan): boolean {
+  const yearAgo: FundsRecord | undefined = memory.funds[0];
+
+  return yearAgo !== undefined && yearAgo.month <= plan.month - 12 &&
+    plan.funds > yearAgo.funds &&
+    memory.funds.every((record: FundsRecord): boolean =>
+      record.funds >= record.reserve + PILE_UP_MARGIN);
+}
+
 /* Rule 7: the tax rate 1 lower when money piles up and taxes are among the
  * worst problems, 1 higher when the city cannot pay its yearly budget,
  * between TAX_MIN and TAX_MAX and at most once a year. */
@@ -956,8 +993,7 @@ function adjustTax(view: CityView, plan: TurnPlan, memory: Memory,
   if (rate < TAX_MIN || (rate < TAX_MAX && cannotPay(view, plan, counts))) {
     change = 1;
   } else if (rate > TAX_MAX || (rate > TAX_MIN &&
-      plan.funds - plan.reserve >= PILE_UP_FUNDS &&
-      taxRank(view.state) < WORST_PROBLEMS)) {
+      moneyPilesUp(memory, plan) && taxRank(view.state) < WORST_PROBLEMS)) {
     change = -1;
   }
 
@@ -1334,6 +1370,7 @@ function createRulesAgent(): Agent {
     emptySince: new Map(),
     rezone: new Set(),
     lastTaxChange: -Infinity,
+    funds: [],
   };
   let report: Record<string, unknown> = {};
 
@@ -1344,7 +1381,7 @@ function createRulesAgent(): Agent {
       crimeThreshold: CRIME_THRESHOLD,
       coverageRadius: COVERAGE_RADIUS,
       fireMinBlocks: FIRE_MIN_BLOCKS,
-      pileUpFunds: PILE_UP_FUNDS,
+      pileUpMargin: PILE_UP_MARGIN,
       worstProblems: WORST_PROBLEMS,
       taxMin: TAX_MIN,
       taxMax: TAX_MAX,
@@ -1380,6 +1417,8 @@ function createRulesAgent(): Agent {
       const network: Set<number> = powerNetwork(view);
       const joins: Position[] = powerJoins(view, network);
       const counts: Census = census(view);
+
+      rememberFunds(memory, plan);
       const rules: Rule[] = [
         { free: false, run: (): Choice | null => buildFirstPlant(view, plan) },
         {

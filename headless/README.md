@@ -477,7 +477,7 @@ it plays the first of these rules that fits, then checks them again:
 4. Crime: with average crime above 50, a police station near the
    developed block with the most crime that no police station covers.
 5. Fire: a fire station where it covers the most developed blocks that
-   no fire station covers, if that is at least 80 blocks.
+   no fire station covers, if that is at least 60 blocks.
 6. Capped demand: a stadium, an airport or a seaport when the census
    passes the threshold at which the engine caps that demand, and the
    city has none.
@@ -554,15 +554,19 @@ works out the census counts from the zone centres in the view, with the
 formulas of `getZonePopulation`, which read them from the tile number.
 The building goes on the site next to a road closest to the city centre.
 
-Money piles up when the funds are $10,000 above the reserve. Taxes are
-among the worst problems when fewer than three of the seven problems are
-higher, ties going to the one listed first in the state. The city cannot
+Money piles up when the funds are higher than a year ago and stayed above
+the reserve in every turn since. The agent remembers its funds and its
+reserve of each turn for that. Taxes are among the worst problems when
+fewer than three of the seven problems are higher, ties going to the one
+listed first in the state. The city cannot
 pay its yearly budget when the last January paid less than full funding,
 from the budget log, or when the funds and the taxes of the next January
 fall short of the yearly cost. The taxes come from the formula of
 `collectTax`, with the land value average taken from the housing problem,
-which is that average times 7 / 10. The $20,000 a new city starts with
-count as piled up, so the rate goes from 7 to 5 in the first two years.
+which is that average times 7 / 10. The money a new city starts with
+does not count as piling up, since it has no year behind it. In a first
+version money piled up at $10,000 above the reserve, so the $20,000 of a
+new city counted, and the rate went from 7 to 5 in the first two years.
 
 A zone is empty when it adds nothing to the census. The agent remembers
 since when each empty zone has had power and a road next to it. Such a
@@ -599,10 +603,14 @@ at the end of a game.
 All thresholds and margins are named constants at the top of
 `agents/rules.ts` and are provisional. They were tuned on seeds 1001 to
 1020, on hard with disasters and on easy without, so seeds 1 to 10 stay
-for reporting. The fire threshold mattered most. At 40 blocks the agent
-built two or three fire stations a game, and on hard that cost about a
-third of the population: a station costs $100 a year, and fire did not
-spread at the time. At 80 it builds one in a few games.
+for reporting. In the first tuning, before fire spread, the fire
+threshold mattered most: at 40 blocks the agent built two or three fire
+stations a game, and on hard that cost about a third of the population,
+since a station costs $100 a year. Since fire spreads (engine change 9),
+60 blocks does a little better than 80 on both levels, and 50 or less
+does worse. The agent then builds about one fire station a game. How far above the reserve the funds must stay for money to pile up
+made little difference: on hard money never piles up, and on easy no
+margin did best.
 
 Ties and orders are fixed. Distances are straight lines, and ties go to
 the tile higher up the map, then to the one further left. Directions are
@@ -618,23 +626,29 @@ wired and the sites it has used. A road quoted at the start of a turn
 can still fail when it is applied, if a power line laid earlier in the
 same turn takes the tiles its route needed.
 
-In a sanity run on seeds 1 to 10, 20 years each, the agent ended with
-7,848 people on average on hard with disasters, against 7,872 for the
-greedy agent, and with 28,504 on easy without disasters, against 24,090.
-Crime averaged 44 and 54 over the turns, against 51 and 98. Budget
-windows opened in 96 years on hard against 118, and in none on easy. No
-action failed. Its weak point is money. It lowers the tax to 5% in the
-first two years, and by 1907 to 1911 the $20,000 of a new city are gone.
-From then on it waits for money in most turns, and in the second half of
-a game it plays nothing in 26 to 40 of its 40 turns. On easy the tax
-stays at 5%, since it only goes up when the city cannot pay its budget,
-and residential demand is capped once the census passes 500 residents.
-On hard the tax reaches 9%, too late for some cities: seed 1 could not
-pay its budget in 1909, its funding stayed cut because its money never
-got back above the reserve, and it ended with 2,820 people. Many homes
-stay empty at the end, 5 to 23 zones on easy and 15 to 30 on hard, where
-the demolition rule needs another type in demand and money above the
-reserve.
+In a sanity run on seeds 1 to 10, 20 years each, with fire spreading,
+the painting and this tax rule, the agent ended with 3,892 people on
+average on hard with disasters, against 7,848 with the first tax rule
+and before the two engine changes, and with 27,782 on easy without
+disasters, against 28,504. Budget windows opened in 97 years on hard and
+in none on easy, and no action failed.
+
+The hard cities stay small for three reasons. On hard the yearly budget
+loses money every year until about 1913, $66 to $309 on average, because
+road upkeep is 1.2 times its base cost there against 0.7 on easy, and
+taxes 0.8 times against 1.4. So the $20,000 of a new city pays for
+everything and is gone by 1907 to 1911. The level is also added to the tax rate when the demand
+valves look up the tax table (`src/valves.js`), so on hard a rate of 7%
+takes 40 off all three demands twice a month, and 9% takes 150, where 5%
+takes nothing. With this tax rule the rate stays at 7% while the start
+money lasts, and then goes up to 9% because the city cannot pay, so
+demand collapses and the cities lose about half of their people after
+their peak around 1909. The first tax rule cut the rate to 5% in the
+first two years, which is why its cities were twice as big. And the
+agent zones more than demand fills: at the end 426 of the 607 zones on
+hard were empty, against 198 of 771 on easy. On seed 5 a fire spread
+through the town from 1908 to the end, with no money for a fire station,
+and the city ended empty.
 
 This agent replaced the greedy agent, which only had the power and the
 growth rules and ignored crime, fire, taxes and the budget. Git history
