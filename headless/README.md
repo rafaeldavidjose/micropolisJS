@@ -481,9 +481,11 @@ it plays the first of these rules that fits, then checks them again:
 6. Capped demand: a stadium, an airport or a seaport when the census
    passes the threshold at which the engine caps that demand, and the
    city has none.
-7. Taxes: 1 lower when money piles up and taxes are among the three
-   worst problems, 1 higher when the city cannot pay its yearly budget,
-   always between 5 and 9 and at most once a year.
+7. Taxes: towards a base rate set by the level, 7% on easy and 5% on
+   hard. Below it, 1 lower when money piles up and taxes are among the
+   three worst problems, and 1 higher again when the city cannot pay its
+   yearly budget, but never above the base or below 5%, and at most once
+   a year.
 8. Demolition: a zone on a site it cleared earlier, then a zone that
    stayed empty with power and a road for 75 months while its type had
    negative demand, then an industrial zone or a coal plant next to
@@ -558,15 +560,25 @@ Money piles up when the funds are higher than a year ago and stayed above
 the reserve in every turn since. The agent remembers its funds and its
 reserve of each turn for that. Taxes are among the worst problems when
 fewer than three of the seven problems are higher, ties going to the one
-listed first in the state. The city cannot
-pay its yearly budget when the last January paid less than full funding,
+listed first in the state. The city cannot pay its yearly budget when the
+last January paid less than full funding,
 from the budget log, or when the funds and the taxes of the next January
 fall short of the yearly cost. The taxes come from the formula of
 `collectTax`, with the land value average taken from the housing problem,
 which is that average times 7 / 10. The money a new city starts with
-does not count as piling up, since it has no year behind it. In a first
-version money piled up at $10,000 above the reserve, so the $20,000 of a
-new city counted, and the rate went from 7 to 5 in the first two years.
+does not count as piling up, since it has no year behind it.
+
+The base depends on the level because the level is added to the tax rate
+when the demand valves look up the tax table (`src/valves.js`). On hard
+5% takes nothing off the three demands, 7% takes 40 twice a month and 9%
+takes 150. On easy 7% takes nothing and 5% adds 50. The base for medium,
+6%, was not tuned. Four rules came before this one. The first cut the
+rate to 5% when the funds were $10,000 above the reserve, which the
+$20,000 of a new city already were. The second waited for a year of
+growing funds, so on hard it kept 7% and then went up to 9% when the
+money ran out. A fixed 5%, and a rule that held 5% and only went up when
+the yearly budget ran at a loss and the reserve was gone, were the
+others. The base rule did best on the tuning seeds, see below.
 
 A zone is empty when it adds nothing to the census. The agent remembers
 since when each empty zone has had power and a road next to it. Such a
@@ -608,9 +620,23 @@ threshold mattered most: at 40 blocks the agent built two or three fire
 stations a game, and on hard that cost about a third of the population,
 since a station costs $100 a year. Since fire spreads (engine change 9),
 60 blocks does a little better than 80 on both levels, and 50 or less
-does worse. The agent then builds about one fire station a game. How far above the reserve the funds must stay for money to pile up
-made little difference: on hard money never piles up, and on easy no
-margin did best.
+does worse. The agent then builds about one fire station a game. How
+far above the reserve the funds must stay for money to pile up made
+little difference: on hard money never piles up, and on easy no margin
+did best.
+
+Since then one objective decides every choice: the mean final population
+after 20 years over seeds 1001 to 1020, on hard with disasters and on
+easy without, each level divided by the mean of the agent before these
+changes (3,669 on hard and 29,925 on easy) and the two averaged. That
+agent scores 1.0. The results swing a lot from seed to seed, from 0 to
+about 25,000 people on hard, so a difference of 0.2 or less is within
+the noise. The tax rules scored 1.0 for the rule that waits for a year
+of growing funds, 1.58 for the first rule, 2.07 for a fixed 5%, 1.17 for
+the rule that holds 5% until the budget runs at a loss, 2.15 for the
+base rule with 6% on hard and 2.78 with 5% on hard. On easy the rule
+that waits for growing funds and the base rule did best, about 30,000
+people against 27,900 for a fixed 5%.
 
 Ties and orders are fixed. Distances are straight lines, and ties go to
 the tile higher up the map, then to the one further left. Directions are

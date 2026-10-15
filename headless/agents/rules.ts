@@ -87,9 +87,12 @@ const PILE_UP_MARGIN: number = 0;
 // Taxes count as among the worst when in this many of the seven problems
 const WORST_PROBLEMS: number = 3;
 
-// The tax rate stays in this range and changes at most once a year
+/* The tax rate never goes above the base of the level and never below
+ * TAX_MIN, and changes at most once a year. The level is added to the
+ * rate when the demand valves look up the tax table, so the same rate
+ * costs more demand on hard. The base for medium was not tuned. */
+const TAX_BASE_BY_LEVEL: readonly number[] = [7, 6, 5];
 const TAX_MIN: number = 5;
-const TAX_MAX: number = 9;
 const TAX_CHANGE_MONTHS: number = 12;
 
 /* An empty zone with power and a road is rezoned after this long. In the
@@ -976,9 +979,10 @@ function moneyPilesUp(memory: Memory, plan: TurnPlan): boolean {
       record.funds >= record.reserve + PILE_UP_MARGIN);
 }
 
-/* Rule 7: the tax rate 1 lower when money piles up and taxes are among the
- * worst problems, 1 higher when the city cannot pay its yearly budget,
- * between TAX_MIN and TAX_MAX and at most once a year. */
+/* Rule 7: the tax rate moves 1 a year towards the base of the level, then
+ * goes 1 lower when money piles up and taxes are among the worst problems,
+ * and 1 higher again when the city cannot pay its yearly budget, but
+ * never above the base. */
 function adjustTax(view: CityView, plan: TurnPlan, memory: Memory,
     counts: Census): Choice | null {
   const rate: number = view.state.taxRate;
@@ -988,12 +992,16 @@ function adjustTax(view: CityView, plan: TurnPlan, memory: Memory,
     return null;
   }
 
+  const base: number = TAX_BASE_BY_LEVEL[view.level];
   let change: number = 0;
 
-  if (rate < TAX_MIN || (rate < TAX_MAX && cannotPay(view, plan, counts))) {
+  if (rate > base) {
+    change = -1;
+  } else if (rate < TAX_MIN ||
+      (rate < base && cannotPay(view, plan, counts))) {
     change = 1;
-  } else if (rate > TAX_MAX || (rate > TAX_MIN &&
-      moneyPilesUp(memory, plan) && taxRank(view.state) < WORST_PROBLEMS)) {
+  } else if (rate > TAX_MIN && moneyPilesUp(memory, plan) &&
+      taxRank(view.state) < WORST_PROBLEMS) {
     change = -1;
   }
 
@@ -1383,8 +1391,8 @@ function createRulesAgent(): Agent {
       fireMinBlocks: FIRE_MIN_BLOCKS,
       pileUpMargin: PILE_UP_MARGIN,
       worstProblems: WORST_PROBLEMS,
+      taxBaseByLevel: TAX_BASE_BY_LEVEL,
       taxMin: TAX_MIN,
-      taxMax: TAX_MAX,
       emptyZoneMonths: EMPTY_ZONE_MONTHS,
       nextToGap: NEXT_TO_GAP,
     }),
