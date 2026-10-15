@@ -34,11 +34,11 @@ npm run replay -- runs/run.json # opens the replay viewer on a run log
 ```
 
 `play:headless` plays one game and writes its run log. The options are
-`--agent` (`random`, `rules`, `greedy`, `passive` or `demo`), `--seed`
-for the city, `--agent-seed` (the city seed if left out), `--level`
-(`easy`, `medium` or `hard`), `--disasters` (`on` or `off`), `--turns`,
-`--months` for the months per turn, `--max-actions` and `--out`. Left
-out, they take the defaults of `runGame`. A bare file name for `--out`,
+`--agent` (`random`, `rules`, `passive` or `demo`), `--seed` for the
+city, `--agent-seed` (the city seed if left out), `--level` (`easy`,
+`medium` or `hard`), `--disasters` (`on` or `off`), `--turns`, `--months`
+for the months per turn, `--max-actions` and `--out`. Left out, they
+take the defaults of `runGame`. A bare file name for `--out`,
 like the default `run.json`, goes into `runs/` at the root of the
 repository, which git ignores. A path with a folder is used as it is. It
 prints the final population and funds, and where the log went, when it
@@ -450,87 +450,6 @@ still draw from the game's generator when one of their actions is
 applied. A run stays reproducible, since the same seeds give the same
 actions at the same points.
 
-## Greedy agent
-
-```ts
-import { createGreedyAgent } from './agents/greedy.ts';
-
-const log: RunLog = await runGame(createGreedyAgent(), { seed: 1 });
-```
-
-The greedy agent follows the most immediate signal, demand. Each turn,
-up to the action limit and while the money lasts, it plays the first of
-these rules that fits, then checks them again:
-
-1. With no power plant, it builds a coal plant on the free site closest
-   to the centre of the map.
-2. When a zone has no power and the power network does not reach it, it
-   lays a power line to the one closest to the city centre.
-3. When zones the network reaches still have no power, the plants cannot
-   feed them all, and it builds another coal plant next to the network.
-4. Otherwise it builds the zone type with the highest positive demand on
-   the free site next to a road closest to the city centre. With no such
-   site, it extends a road.
-
-The overloaded plant comes before growth, since new zones on a network
-that is already short of power would only share the same power. With
-growth first, the bigger towns ended the game with up to half of their
-zones without power.
-
-It ignores crime, fire, pollution, taxes and the budget, and never
-changes the tax rate or the budget settings. It quotes every action and
-only plays the ones the turn can still pay for. When the money is short
-it waits for the next turn. It draws no random numbers.
-
-The city centre is the mean of the zone and building centres in `zones`,
-or the centre of the map before there are any. Distances are straight
-lines. Ties go to the tile higher up the map, then to the one further
-left, and directions are tried in the order east, south, west, north. A
-free site is one whose quote succeeds. The agent only quotes sites made
-of free land and plain power lines, which the tools clear, since a
-building passes power on like a line.
-
-The network is every tile power can reach from a plant through tiles
-that conduct: power lines, the road and rail crossings that carry them,
-and zones and buildings. That is the path of the power scan, without
-its limit on how many tiles a plant feeds. Rule 2 runs the line from the
-point of the network closest to the zone, which is one of its power
-lines or free land next to it, to the tile next to the zone closest to
-that point. Rule 3 is what is left for zones the network does reach.
-
-A new road goes to land the agent can build on. Its end is the free
-tile next to an open zone site that no road touches yet, closest to the
-city centre: a 3 by 3 site of free land or plain power lines. It starts
-on the road tile closest to that end, and `planRoute` finds the way,
-bridges included. Once the road is there, the site touches it and the
-next turn can build a zone on it. When the route or its quote fails for
-a reason other than money, it tries the next end, up to 20 in a turn,
-since each try is a full route search. While there is no road at all,
-the first one starts on the free tile closest to the centre and runs 6
-tiles in the first direction where the next tile is free and the end is
-free land, once in a turn. Buildings and power line ends stay off the
-tile straight past the end of each road.
-
-In the first version every new road ended 6 tiles straight ahead of a
-road tile. Once the land near the town was used, or the town was on an
-island, those ends were all on water or taken land, and the agent
-stopped for good with money and demand left: on easy, seed 4 after turn
-19 and seed 6 after turn 159. A test checks that it now keeps building
-past those turns, and that in every turn with a positive demand it either
-acts or waits for money.
-
-Like any agent it only gives the two ends of a route, and the route
-comes from `planRoute`. The view does not change during a turn, so the
-agent keeps the money and the tiles its earlier actions of the turn
-take, and the zones it has already wired. Its report in each turn of the
-log lists the rules it used and whether it waited for money.
-
-It can still stop for good where its first road is closed in by zones
-and its own power lines, which a road cannot cross, as on seed 10. A
-road quoted at the start of a turn can also fail when it is applied, if
-a power line laid earlier in the same turn takes the tiles its route
-needed.
-
 ## Rule-based agent
 
 ```ts
@@ -543,9 +462,12 @@ The rule-based agent deals with all the problems of the city and can
 demolish. Each turn, up to the action limit and while the money lasts,
 it plays the first of these rules that fits, then checks them again:
 
-1. Power, the three rules of the greedy agent: a first coal plant, a
-   power line to a zone the network does not reach, and another coal
-   plant when the network cannot feed its zones.
+1. Power: with no power plant, a coal plant on the free site closest to
+   the centre of the map. When a zone has no power and the power network
+   does not reach it, a power line to the one closest to the city
+   centre. When zones the network reaches still have no power, the
+   plants cannot feed them all, and another coal plant goes next to the
+   network.
 2. Budget: when one of the three funding shares is below 100% and the
    money covers the reserve, all three go back to 100%. When auto budget
    is off and the money covers the reserve, auto budget goes back on.
@@ -565,9 +487,13 @@ it plays the first of these rules that fits, then checks them again:
    stayed empty with power and a road for 75 months while its type had
    negative demand, then an industrial zone or a coal plant next to
    homes when that cuts neither jobs nor power.
-9. Growth, as the greedy agent, but homes never go next to industry,
-   power plants, the seaport or the airport, and those never go next to
-   homes.
+9. Growth: the zone type with the highest positive demand, on the free
+   site next to a road closest to the city centre, or a new road when
+   there is no such site. Homes never go next to industry, power plants,
+   the seaport or the airport, and those never go next to homes.
+
+The overloaded plant comes before growth, since new zones on a network
+that is already short of power would only share the same power.
 
 It always keeps a reserve for the next yearly budget: the full yearly
 cost by the formulas of `collectTax` in `src/budget.js`, counted on the
@@ -580,6 +506,34 @@ taxes, so it saves up for what the rule needs. The capped demand rule is
 the exception and builds only when the money is there. Saving for a
 stadium of $5,000 or an airport of $10,000 held up all growth for the
 last ten years of some easy games.
+
+The city centre is the mean of the zone and building centres in `zones`,
+or the centre of the map before there are any. A free site is one whose
+quote succeeds. The agent only quotes sites made of free land, plain
+power lines and explosion tiles, which the tools clear, since a building
+passes power on like a line.
+
+The network is every tile power can reach from a plant through tiles
+that conduct: power lines, the road and rail crossings that carry them,
+and zones and buildings. That is the path of the power scan, without
+its limit on how many tiles a plant feeds. The power line of rule 1 runs
+from the point of the network closest to the zone, which is one of its
+power lines or free land next to it, to the tile next to the zone
+closest to that point. The second plant is for zones the network does
+reach.
+
+A new road goes to land the agent can build on. Its end is the free
+tile next to an open zone site that no road touches yet and that can
+take the zone, closest to the city centre. It starts on the road tile
+closest to that end, and `planRoute` finds the way, bridges included.
+Once the road is there, the site touches it and the next turn can build
+a zone on it. When the route or its quote fails for a reason other than
+money, it tries the next end, up to 20 in a turn, since each try is a
+full route search. While there is no road at all, the first one starts
+on the free tile closest to the centre and runs 6 tiles in the first
+direction where the next tile is free and the end is free land, once in
+a turn. Buildings and power line ends stay off the tile straight past
+the end of each road, so a street can go on.
 
 The view has no coverage maps, since the browser shows none (see the
 view above). The agent counts a block as covered when a station has its
@@ -641,9 +595,9 @@ rubble when the browser paints them (`getTiles` in
 for $1, like rubble, and the agent counts them as land it can build on,
 and on a road tile as a road to rebuild.
 
-The 75 months come from the greedy agent's 20 year games after the crime
-and traffic fixes, seeds 1 to 10, on hard with disasters and on easy
-without. Of the 3,213 times an empty zone with power and a road went on
+The 75 months come from the 20 year games of the greedy agent, which
+this agent replaced, after the crime and traffic fixes, seeds 1 to 10,
+on hard with disasters and on easy without. Of the 3,213 times an empty zone with power and a road went on
 to develop, half did so within a year, 90% within 4.5 years, 95% within
 75 months and 99% within 10.5 years. Another 888 zones were still empty
 at the end of a game.
@@ -663,6 +617,19 @@ residential, commercial, industrial. Like every agent it only gives the
 two ends of a route, quotes every action and draws no random numbers.
 Its report in each turn of the log lists the rule behind each action,
 the reserve it kept and whether it waited for money.
+
+The view does not change during a turn, so the agent keeps the money and
+the tiles its earlier actions of the turn take, the zones it has already
+wired and the sites it has used. A road quoted at the start of a turn
+can still fail when it is applied, if a power line laid earlier in the
+same turn takes the tiles its route needed.
+
+This agent replaced the greedy agent, which only had the power and the
+growth rules and ignored crime, fire, taxes and the budget. Git history
+keeps it, last in commit `ceb8207`. In its first version every new road
+ended 6 tiles straight ahead of a road tile, and once those ends were on
+water or taken land it stopped for good with money and demand left. The
+road to an open site came from that.
 
 ## Demo agent
 

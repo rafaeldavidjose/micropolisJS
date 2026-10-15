@@ -157,16 +157,6 @@ const REPORT_HELP = {
     gaveUp: 'Slots left empty after too many rejected draws, 20 by default.',
   },
 
-  // greedy.ts
-  greedy: {
-    rules: 'The rules the greedy agent played this turn, in order: 1 a ' +
-      'first power plant, 2 a power line to a zone the network does not ' +
-      'reach, 3 another plant for an overloaded network, 4 a zone or a new ' +
-      'road for the highest demand.',
-    waitingForMoney: 'True when the greedy agent stopped because the next ' +
-      'action cost more than the money left.',
-  },
-
   // rules.ts
   rules: {
     rules: 'The rule behind each action of this turn, in order. Power: ' +
