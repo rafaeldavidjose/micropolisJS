@@ -159,7 +159,8 @@ const REPORT_HELP = {
 
   // rules.ts
   rules: {
-    rules: 'The rule behind each action of this turn, in order. Power: ' +
+    rules: 'The rule behind each action of this turn, in order. Fire: ' +
+      'firebreak, emergency-station. Power: ' +
       'first-plant, connect-zone, extra-plant. Budget: funding, ' +
       'auto-budget. Maintenance: repair-road. Then police, fire-station, ' +
       'stadium, airport or port for a capped demand, raise-tax or ' +

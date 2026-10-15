@@ -15,12 +15,16 @@ import type {
 } from '../types.ts';
 import {
   AIRPORT,
+  FIREBASE,
   FIRESTATION,
   FULLSTADIUM,
   HBRDG0,
   HBRDG3,
   HTRFBASE,
+  LASTFIRE,
+  LASTPOWER,
   LASTRAIL,
+  LASTROAD,
   NUCLEAR,
   POLICESTATION,
   PORT,
@@ -29,8 +33,10 @@ import {
   RAILBASE,
   ROADBASE,
   STADIUM,
+  TREEBASE,
   VBRDG0,
   VBRDG3,
+  WOODS5,
 } from '../../src/tileValues.ts';
 import {
   conducts,
@@ -472,12 +478,12 @@ function placedFor(view: CityView, plan: TurnPlan, tool: string,
 /* The quote of an action the turn can still pay for, keeping the reserve,
  * or null. When the money is short the agent waits for it: the turn plays
  * no more actions that cost money. */
-function payable(view: CityView, plan: TurnPlan,
-    action: GameAction): ActionResult | null {
+function payable(view: CityView, plan: TurnPlan, action: GameAction,
+    keep: number = plan.reserve): ActionResult | null {
   const quote: ActionResult = view.quote(action);
 
   if (quote.success &&
-      (quote.cost === 0 || quote.cost <= plan.funds - plan.reserve)) {
+      (quote.cost === 0 || quote.cost <= plan.funds - keep)) {
     return quote;
   }
 
@@ -488,10 +494,11 @@ function payable(view: CityView, plan: TurnPlan,
   return null;
 }
 
-// The first free site from the centres, taken by distance to the target
+/* The first free site from the centres, taken by distance to the target.
+ * It keeps the reserve unless told to keep less. */
 function buildNear(view: CityView, plan: TurnPlan, rule: string,
     tool: string, size: number, centres: Position[],
-    target: Position): Choice | null {
+    target: Position, keep: number = plan.reserve): Choice | null {
   for (const centre of sortByDistance([...centres], target)) {
     if (!isOpenSite(view, plan, centre, size)) {
       continue;
@@ -506,7 +513,7 @@ function buildNear(view: CityView, plan: TurnPlan, rule: string,
     const action: GameAction = {
       type: 'build', tool: tool, x: centre.x, y: centre.y,
     };
-    const quote: ActionResult | null = payable(view, plan, action);
+    const quote: ActionResult | null = payable(view, plan, action, keep);
 
     if (plan.outOfMoney) {
       return null;
@@ -551,6 +558,91 @@ function roadSites(view: CityView, plan: TurnPlan, size: number): Position[] {
   plan.roadSites.set(size, centres);
 
   return centres;
+}
+
+function isFire(value: number): boolean {
+  return value >= FIREBASE && value <= LASTFIRE;
+}
+
+/* What a fire spreads to and the bulldozer clears to bare land: trees and
+ * parks, roads but not bridges, power lines and rails. Zones and buildings
+ * burn too, but only go whole, from their centre. */
+function isFuel(value: number): boolean {
+  return (value >= TREEBASE && value <= WOODS5) ||
+    (value >= ROADBASE && value <= LASTROAD &&
+      ((value - ROADBASE) & 15) >= 2) ||
+    (value >= POWERBASE && value <= LASTPOWER) ||
+    (value >= RAILBASE && value <= LASTRAIL);
+}
+
+function fireTiles(map: MapView): Position[] {
+  const fires: Position[] = [];
+
+  for (let y: number = 0; y < map.height; y++) {
+    for (let x: number = 0; x < map.width; x++) {
+      if (isFire(map.getTileValue(x, y))) {
+        fires.push({ x: x, y: y });
+      }
+    }
+  }
+
+  return fires;
+}
+
+function isNextToFire(map: MapView, tile: Position): boolean {
+  return DIRECTIONS.some((direction: Position): boolean =>
+    isOnMap(map, tile.x + direction.x, tile.y + direction.y) &&
+    isFire(map.getTileValue(tile.x + direction.x, tile.y + direction.y)));
+}
+
+/* Rule 0: an emergency when something burns. If no fire station covers the
+ * fire closest to the city centre, one goes on the site next to a road
+ * closest to it, from the reserve too. Then a firebreak: the fuel next to
+ * the fire is bulldozed, a tile at a time, the closest to the city centre
+ * first. A fire spreads only to the four tiles next to it. */
+function fightFire(view: CityView, plan: TurnPlan,
+    fires: Position[]): Choice | null {
+  if (fires.length === 0) {
+    return null;
+  }
+
+  const map: MapView = view.map;
+  const nearest: Position = sortByDistance([...fires], plan.centre)[0];
+  const stations: Position[] = stationsOf(view, FIRESTATION);
+
+  if (!plan.done.has('emergency-station') &&
+      !stations.some((station: Position): boolean =>
+        covers(station, nearest))) {
+    const centres: Position[] = roadSites(view, plan, ZONE_SIZE).filter(
+      (centre: Position): boolean => covers(centre, nearest));
+    const station: Choice | null = buildNear(view, plan, 'emergency-station',
+      'fire', ZONE_SIZE, centres, nearest, 0);
+
+    plan.done.add('emergency-station');
+
+    if (station !== null) {
+      return station;
+    }
+  }
+
+  const front: Position[] = uniqueTiles(map, fires.flatMap(
+    (fire: Position): Position[] => DIRECTIONS.map(
+      (direction: Position): Position =>
+        ({ x: fire.x + direction.x, y: fire.y + direction.y }))))
+    .filter((tile: Position): boolean =>
+      !plan.taken.has(indexOf(map, tile.x, tile.y)) &&
+      isFuel(map.getTileValue(tile.x, tile.y)));
+
+  for (const tile of sortByDistance(front, plan.centre)) {
+    const action: GameAction = { type: 'bulldoze', x: tile.x, y: tile.y };
+    const quote: ActionResult | null = payable(view, plan, action, 0);
+
+    if (quote !== null) {
+      return choiceOf('firebreak', action, quote.cost, [tile]);
+    }
+  }
+
+  return null;
 }
 
 // Rule 1a: with no power plant, a coal plant closest to the centre of the map
@@ -709,7 +801,8 @@ function repairRoad(view: CityView, plan: TurnPlan): Choice | null {
   const isBroken: (tile: Position) => boolean = (tile: Position): boolean =>
     isOnMap(map, tile.x, tile.y) &&
     plan.brokenRoads.has(indexOf(map, tile.x, tile.y)) &&
-    !plan.taken.has(indexOf(map, tile.x, tile.y));
+    !plan.taken.has(indexOf(map, tile.x, tile.y)) &&
+    !isNextToFire(map, tile);
   const broken: number[] = [...plan.brokenRoads]
     .sort((first: number, second: number): number => first - second);
   let tries: number = 0;
@@ -1366,12 +1459,13 @@ function commit(view: CityView, plan: TurnPlan, memory: Memory,
 
 /* A rule-based agent. Each turn, up to the action limit and while the
  * money lasts, it plays the first of its rules that fits, then checks them
- * again: power, the budget, road repairs, police, fire stations, capped
- * demand, taxes, demolition and growth. It keeps a reserve for the next
- * yearly budget. A rule that fits but costs more than the money above the
- * reserve makes the agent wait: the rest of the turn plays only the free
- * rules, the budget and the taxes. It draws no random numbers, and routes
- * only get their two ends from it, the route itself comes from planRoute. */
+ * again: a fire emergency, power, the budget, road repairs, police, fire
+ * stations, capped demand, taxes, demolition and growth. It keeps a
+ * reserve for the next yearly budget. A rule that fits but costs more than
+ * the money above the reserve makes the agent wait: the rest of the turn
+ * plays only the fire emergency and the free rules, the budget and the
+ * taxes. It draws no random numbers, and routes only get their two ends
+ * from it, the route itself comes from planRoute. */
 function createRulesAgent(): Agent {
   const memory: Memory = {
     roads: new Set(),
@@ -1427,7 +1521,10 @@ function createRulesAgent(): Agent {
       const counts: Census = census(view);
 
       rememberFunds(memory, plan);
+      const fires: Position[] = fireTiles(view.map);
+      // The fire emergency also runs while the agent waits for money
       const rules: Rule[] = [
+        { free: true, run: (): Choice | null => fightFire(view, plan, fires) },
         { free: false, run: (): Choice | null => buildFirstPlant(view, plan) },
         {
           free: false,

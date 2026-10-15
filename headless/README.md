@@ -463,6 +463,10 @@ The rule-based agent deals with all the problems of the city and can
 demolish. Each turn, up to the action limit and while the money lasts,
 it plays the first of these rules that fits, then checks them again:
 
+0. Fire, an emergency: when something burns, a fire station near the
+   fire if no station covers it, and a firebreak, bulldozing the trees,
+   parks, roads, rails and power lines next to the fire. Both may use the
+   reserve.
 1. Power: with no power plant, a coal plant on the free site closest to
    the centre of the map. When a zone has no power and the power network
    does not reach it, a power line to the one closest to the city
@@ -604,6 +608,20 @@ route from the tile to itself. A drawbridge opens for a ship and leaves
 water where its road was, with its raised halves at most two tiles away
 (`doBridge` in `src/road.js`). Water counts as a fallen bridge only
 without them, or the agent would lay a bridge in the channel.
+
+A fire spreads only to the four tiles next to it, and the bulldozer turns
+trees, parks, roads, rails and power lines into bare land that cannot
+burn, for $1. It cannot clear a burning tile, or a tile of a zone other
+than its centre, which would take the whole zone. So the firebreak
+bulldozes the fuel next to the fire, the tile closest to the city centre
+first, and leaves zones and bridges alone. The station goes on the site
+next to a road closest to the fire nearest to the city centre, one a turn
+at most. The emergency comes first and also runs while the agent waits
+for money, and repairs leave road tiles next to a fire alone until it is
+out. In a forest fire next to the shop town of the tests, the agent cuts
+off the fire on its first tile, where 42 tiles burn in two years when no
+one acts. On the tuning seeds fires are rare, and the rule moved the
+objective by less than the noise, 2.75 with it against 2.79 without.
 
 The 75 months come from the 20 year games of the greedy agent, which
 this agent replaced, after the crime and traffic fixes, seeds 1 to 10,

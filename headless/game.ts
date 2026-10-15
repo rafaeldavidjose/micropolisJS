@@ -410,6 +410,7 @@ export {
   DEFAULT_OPTIONS,
   allBudgetWindows,
   applyAction,
+  makeView,
   runGame,
   writeRunLog,
 };

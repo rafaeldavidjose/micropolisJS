@@ -2,9 +2,21 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runGame } from '../game.ts';
+import { createCity, stepMonths, Simulation } from '../runner.ts';
+import { getMap } from '../engine.ts';
+import { DEFAULT_OPTIONS, applyAction, makeView, runGame } from '../game.ts';
 import { ROUTE_TOOLS } from '../routes.ts';
 import { createRulesAgent } from '../agents/rules.ts';
+import { Tile } from '../../src/tile.ts';
+import { TileUtils } from '../../src/tileUtils.js';
+import { BLBNBIT } from '../../src/tileFlags.ts';
+import {
+  FIREBASE,
+  LASTFIRE,
+  LASTRUBBLE,
+  RUBBLE,
+  WOODS,
+} from '../../src/tileValues.ts';
 import type {
   ActionResult,
   Agent,
@@ -12,7 +24,9 @@ import type {
   CityView,
   GameAction,
   GameOptions,
+  MapLike,
   RunLog,
+  SimulationLike,
   TurnLog,
 } from '../types.ts';
 
@@ -150,8 +164,9 @@ test('rules agent: every route it plays comes from planRoute',
 });
 
 /* The view's quote is wrapped to remember every answer. Each action the
- * agent returns must have been quoted that turn with success, and what
- * the turn spends must leave the reserve, unless it spends nothing. */
+ * agent returns must have been quoted that turn with success. What the
+ * turn spends must leave the reserve, unless it spends nothing, apart from
+ * the fire emergency, which may use the reserve too. */
 test('rules agent: it only plays actions whose quote succeeded',
   async (): Promise<void> => {
   const rules: Agent = createRulesAgent();
@@ -169,20 +184,29 @@ test('rules agent: it only plays actions whose quote succeeded',
         },
       });
       const reserve: number = rules.report?.().reserve as number;
+      const played: string[] = rules.report?.().rules as string[];
       let spent: number = 0;
+      let emergency: number = 0;
 
-      for (const action of actions) {
+      actions.forEach((action: GameAction, index: number): void => {
         const quote: ActionResult | undefined =
           quotes.get(JSON.stringify(action));
 
         assert.ok(quote !== undefined && quote.success,
           'turn ' + view.turn + ': ' + JSON.stringify(action));
-        spent += quote.cost;
+
+        if (['firebreak', 'emergency-station'].includes(played[index])) {
+          emergency += quote.cost;
+        } else {
+          spent += quote.cost;
+        }
+
         checked++;
-      }
+      });
 
       assert.ok(spent === 0 || spent <= view.state.funds - reserve,
         'turn ' + view.turn);
+      assert.ok(spent + emergency <= view.state.funds, 'turn ' + view.turn);
       return actions;
     },
   };
@@ -272,4 +296,95 @@ test('rules agent: it bulldozes a zone left empty for 75 months',
   assert.equal((demolitions[0].actions[0].action as GameAction).type,
     'bulldoze');
   assert.ok(demolitions[0].actions[0].result.success);
+});
+
+interface FireRun {
+  burnt: number;
+  firstActions: GameAction[];
+  firstRules: string[];
+}
+
+const FIRE_X: number = 66;
+const FIRE_Y: number = 50;
+
+/* The shop town with homes south of its road, a forest south of that, and
+ * a fire lit in the forest. Then 8 turns, with the agent or with no one
+ * acting, and the burning and burnt tiles counted. The game loop cannot
+ * light a fire, so the test plays the turns itself. */
+async function burnNextToTown(withAgent: boolean): Promise<FireRun> {
+  const city: SimulationLike = createCity({
+    seed: TOWN_SEED, level: Simulation.LEVEL_EASY, disasters: false,
+  });
+  const map: MapLike = getMap(city);
+  const options: GameOptions = { ...DEFAULT_OPTIONS, seed: TOWN_SEED };
+  const agent: Agent = createRulesAgent();
+  const run: FireRun = { burnt: 0, firstActions: [], firstRules: [] };
+
+  for (const action of shopTown()) {
+    applyAction(city, action);
+  }
+
+  for (const x of [61, 64, 67, 70]) {
+    applyAction(city, { type: 'build', tool: 'residential', x: x, y: 42 });
+  }
+
+  for (let y: number = 44; y <= 58; y++) {
+    for (let x: number = 54; x <= 78; x++) {
+      map.setTo(x, y, new Tile(WOODS, BLBNBIT));
+    }
+  }
+
+  stepMonths(city, 3);
+  map.setTo(FIRE_X, FIRE_Y, TileUtils.randomFire());
+
+  for (let turn: number = 0; turn < 8; turn++) {
+    if (withAgent) {
+      const actions: GameAction[] =
+        await agent.decide(makeView(city, options, turn));
+
+      if (turn === 0) {
+        run.firstActions = actions;
+        run.firstRules = agent.report?.().rules as string[];
+      }
+
+      for (const action of actions) {
+        applyAction(city, action);
+      }
+    }
+
+    stepMonths(city, 3);
+  }
+
+  for (let y: number = 36; y <= 58; y++) {
+    for (let x: number = 54; x <= 78; x++) {
+      const value: number = map.getTileValue(x, y);
+      run.burnt += (value >= FIREBASE && value <= LASTFIRE) ||
+        (value >= RUBBLE && value <= LASTRUBBLE) ? 1 : 0;
+    }
+  }
+
+  return run;
+}
+
+/* A fire spreads only to the four tiles next to it. The agent bulldozes
+ * them in its first turn, and the fire burns far less than when no one
+ * acts, 42 tiles in two years. */
+test('rules agent: it cuts a firebreak around a forest fire',
+  async (): Promise<void> => {
+  const withAgent: FireRun = await burnNextToTown(true);
+  const without: FireRun = await burnNextToTown(false);
+  const firebreak: GameAction[] = withAgent.firstActions.filter(
+    (action: GameAction, index: number): boolean =>
+      withAgent.firstRules[index] === 'firebreak');
+
+  assert.ok(firebreak.length > 0);
+
+  for (const action of firebreak) {
+    assert.equal(action.type, 'bulldoze');
+    assert.equal(Math.abs((action as { x: number }).x - FIRE_X) +
+      Math.abs((action as { y: number }).y - FIRE_Y), 1);
+  }
+
+  assert.ok(withAgent.burnt * 5 < without.burnt,
+    `${withAgent.burnt} against ${without.burnt}`);
 });
