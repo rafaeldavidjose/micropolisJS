@@ -985,12 +985,11 @@ problems at 250 instead of 256. For an agent this means the score rewards
 a population that does not dip just before January more than it rewards
 good services, and it is noisy from year to year.
 
-The disasters have five more, also described there. A flood can start
+The disasters have four more, also described there. A flood can start
 on any bulldozable tile next to water but never on bare land without
 flags. Planes never collide. An explosion lights only its own tile
-instead of that tile and the four diagonal neighbours. Ships wreck on
-land with disasters off. And a burning or flooded zone marks the wrong
-tiles bulldozable.
+instead of that tile and the four diagonal neighbours. And ships wreck
+on land with disasters off.
 
 Crime was always 0, because the crime scan never ran. That bug is fixed,
 as an exception to the rule for `src/`, since it removed one of the seven
@@ -1009,7 +1008,9 @@ neighbours, so every fire went out on its own tile and fire stations had
 almost nothing to do. That is fixed for the same reason (`CHANGES.md`,
 change 9). A fire now spreads to the tiles next to it that can burn,
 which include trees, parks, roads, rails, power lines, zones and
-buildings, and it goes out much sooner near a fire station.
+buildings, and it goes out much sooner near a fire station. When a fire
+reaches a zone, the rest of the zone becomes bulldozable, which a
+misplaced parenthesis had also broken (change 10).
 
 A bulldozed zone or building, and any tile a tornado or a monster
 destroys, becomes an explosion. Nothing in the simulation ends it: the

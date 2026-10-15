@@ -153,7 +153,7 @@ var fireZone = function(map, x, y, blockMaps) {
   if (tileValue === TileValues.AIRPORT)
     zoneSize = 5;
   else if (tileValue >= TileValues.PORTBASE)
-    zoneSize = 3;
+    zoneSize = 4;
   else if (tileValue < TileValues.PORTBASE)
       zoneSize = 2;
 
@@ -166,7 +166,7 @@ var fireZone = function(map, x, y, blockMaps) {
       if (!map.testBounds(xTem, yTem))
         continue;
 
-      if (map.getTileValue(xTem, yTem >= TileValues.ROADBASE))
+      if (map.getTileValue(xTem, yTem) >= TileValues.ROADBASE)
         map.addTileFlags(xTem, yTem, BULLBIT);
     }
   }

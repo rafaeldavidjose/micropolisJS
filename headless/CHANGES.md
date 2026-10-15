@@ -204,6 +204,8 @@ traffic after 10 years and the traffic problem is 26.
 
 ### 9. src/miscTiles.js: fire never spread
 
+Commit `fe8c6f6`.
+
 A burning tile tries to set each of its four neighbours on fire.
 `fireFound` read the tile at `x, y`, the burning tile itself, instead of
 the neighbour at `xTem, yTem`. A fire tile has no burn flag, so the check
@@ -254,6 +256,53 @@ changes 5 and 6. `headless/test/fire.test.ts` lights the middle of a
 forest on five maps. A year later 102 tiles have burnt in all, and 13 with
 a powered fire station north of the forest. Before the fix it was one tile
 for each fire in both cases.
+
+### 10. src/zoneUtils.js: a burning zone marked the wrong tiles
+
+When a fire, a flood, a tornado or a monster reaches the centre of a zone
+or a building, `fireZone` lowers the growth rate there and marks the other
+tiles of the zone bulldozable, so the ruin can be cleared. Its check
+`map.getTileValue(xTem, yTem >= TileValues.ROADBASE)` had a misplaced
+parenthesis. It passed a boolean as `y`, read a tile in the top row of the
+map, and marked a tile of the zone only when that far tile was not bare
+land. In the test city none of them was marked, and the ruin of a burnt
+zone could not be bulldozed. The check now compares the tile itself, as in
+the original, `s_sim.c` lines 981 and 982:
+
+```c
+      if ((short)(Map[Xtem][Ytem] & LOMASK) >= ROADBASE) /* post release */
+	Map[Xtem][Ytem] |= BULLBIT;
+```
+
+The port also used a zone size of 3 for the seaport, the power plants and
+the other buildings of 4 by 4 tiles, where the original uses 4, lines 965
+to 972:
+
+```c
+  ch = ch & LOMASK;
+  if (ch < PORTBASE)
+    XYmax = 2;
+  else
+    if (ch == AIRPORT)
+      XYmax = 5;
+    else
+      XYmax = 4;
+```
+
+The loop runs from -1 to below that size. 2 covers a zone of 3 by 3 tiles
+and 5 an airport of 6 by 6, but 4 covers the 4 by 4 building and one more
+column and row. That only matters where another zone or building stands
+there, since roads, rails, power lines and parks can be bulldozed anyway.
+The port's 3 matched the building exactly. Both now follow the original
+and `fireZone` in MicropolisCore (`simulate.cpp`). MicropolisCore clamps
+the growth rate to -200 and 200 like the port, where the original does
+not, and the clamp stays.
+
+With fire spreading since change 9, fires reach zones and buildings, so
+this falls under the same exception. In `headless/test/fire.test.ts` a
+zone set on fire with `fireZone` can be bulldozed on all of its tiles, and
+a burning coal plant marks its own 16 tiles and the edge of the zone next
+to it. Before the fix neither held.
 
 ## Configuration changes
 
@@ -568,21 +617,3 @@ original only does it with disasters on, `w_sprite.c` lines 897 to 909:
     }
   }
 ```
-
-### Disasters: a burning zone
-
-`fireZone` in `src/zoneUtils.js` differs from the original `FireZone`,
-`s_sim.c` lines 958 to 984. The check
-`map.getTileValue(xTem, yTem >= TileValues.ROADBASE)` has a misplaced
-parenthesis, so it passes a boolean as `y` and marks the wrong tiles as
-bulldozable. The original:
-
-```c
-      if ((short)(Map[Xtem][Ytem] & LOMASK) >= ROADBASE) /* post release */
-	Map[Xtem][Ytem] |= BULLBIT;
-```
-
-The port also uses a zone size of 3 instead of 4 for ports and the other
-large buildings, and clamps the growth rate where the original does not.
-Spreading floods (`doFlood`) reach it, tornadoes and monsters through
-`destroyMapTile`, and since change 9 a fire that spreads to a zone.
