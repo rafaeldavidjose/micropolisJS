@@ -35,7 +35,6 @@ import {
 import {
   conducts,
   isBuilding,
-  isExplosion,
   isFreeLand,
   isPowerPlant,
   isRoad,
@@ -331,11 +330,6 @@ function remember(view: CityView, memory: Memory, month: number): void {
   }
 }
 
-// Land the tools clear for $1, an explosion that never ended included
-function isClearable(value: number): boolean {
-  return isFreeLand(value) || isExplosion(value);
-}
-
 /* A drawbridge opens for a ship and leaves water where its road was, with
  * the raised halves at most two tiles away (doBridge in src/road.js). */
 function isNearOpenBridge(map: MapView, tile: Position): boolean {
@@ -364,7 +358,7 @@ function brokenRoads(view: CityView, memory: Memory): Set<number> {
     const tile: Position = positionOf(view.map, index);
     const value: number = view.map.getTileValue(tile.x, tile.y);
 
-    if (isClearable(value) ||
+    if (isFreeLand(value) ||
         (isWater(value) && !isNearOpenBridge(view.map, tile))) {
       broken.add(index);
     }
@@ -381,7 +375,7 @@ function isOpenLand(view: CityView, plan: TurnPlan, tile: Position): boolean {
   const index: number = indexOf(view.map, tile.x, tile.y);
 
   return !plan.taken.has(index) && !plan.brokenRoads.has(index) &&
-    isClearable(view.map.getTileValue(tile.x, tile.y));
+    isFreeLand(view.map.getTileValue(tile.x, tile.y));
 }
 
 // Free land, or a power line that a road may cross if it runs straight

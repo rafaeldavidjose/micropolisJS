@@ -22,7 +22,6 @@ import {
   INDCLR,
   IZB,
   LASTPORT,
-  LASTTINYEXP,
   LASTPOWERPLANT,
   LASTROAD,
   LASTRUBBLE,
@@ -77,14 +76,6 @@ function isFreeLand(value: number): boolean {
 // Open water, where a fallen bridge goes back to
 function isWater(value: number): boolean {
   return value === RIVER || value === REDGE || value === CHANNEL;
-}
-
-/* What the bulldozer leaves on a zone or building, and a tornado or monster
- * on any tile. Nothing in the simulation turns it into rubble: the browser
- * does that when it paints the tile (getTiles in src/animationManager.js),
- * so headless it stays. The tools clear it for $1, like rubble. */
-function isExplosion(value: number): boolean {
-  return value >= TINYEXP && value <= LASTTINYEXP;
 }
 
 /* Power lines, the road and rail crossings that carry them, and zones and
@@ -172,7 +163,6 @@ function zonePopulation(map: MapView, zone: ZoneView): number {
 export {
   conducts,
   isBuilding,
-  isExplosion,
   isFreeLand,
   isPowerPlant,
   isRoad,

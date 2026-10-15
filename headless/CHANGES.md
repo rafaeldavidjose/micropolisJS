@@ -259,6 +259,8 @@ for each fire in both cases.
 
 ### 10. src/zoneUtils.js: a burning zone marked the wrong tiles
 
+Commit `5d4f48e`.
+
 When a fire, a flood, a tornado or a monster reaches the centre of a zone
 or a building, `fireZone` lowers the growth rate there and marks the other
 tiles of the zone bulldozable, so the ruin can be cleared. Its check

@@ -87,8 +87,8 @@ units make one month. If the city cannot pay for its services, the engine
 stops and waits for the player to answer the budget window. `stepMonths`
 answers it and goes on, see "Budget window" below.
 
-After every `forceTick()`, `stepMonths` also moves the sprites 3 times,
-see "Sprites" below.
+After every `forceTick()`, `stepMonths` also moves the sprites and
+paints 3 times, see "Sprites" and "Painting" below.
 
 Two engine settings are fixed in headless.
 
@@ -510,9 +510,9 @@ last ten years of some easy games.
 
 The city centre is the mean of the zone and building centres in `zones`,
 or the centre of the map before there are any. A free site is one whose
-quote succeeds. The agent only quotes sites made of free land, plain
-power lines and explosion tiles, which the tools clear, since a building
-passes power on like a line.
+quote succeeds. The agent only quotes sites made of free land and plain
+power lines, which the tools clear, since a building passes power on like
+a line.
 
 The network is every tile power can reach from a plant through tiles
 that conduct: power lines, the road and rail crossings that carry them,
@@ -588,13 +588,6 @@ route from the tile to itself. A drawbridge opens for a ship and leaves
 water where its road was, with its raised halves at most two tiles away
 (`doBridge` in `src/road.js`). Water counts as a fallen bridge only
 without them, or the agent would lay a bridge in the channel.
-
-A bulldozed zone or building leaves explosion tiles, and so does a
-tornado or a monster on any tile. micropolisJS only turns them into
-rubble when the browser paints them (`getTiles` in
-`src/animationManager.js`), so headless they stay. The tools clear them
-for $1, like rubble, and the agent counts them as land it can build on,
-and on a road tile as a road to rebuild.
 
 The 75 months come from the 20 year games of the greedy agent, which
 this agent replaced, after the crime and traffic fixes, seeds 1 to 10,
@@ -965,14 +958,54 @@ Without this, a tornado stayed where it appeared for good and changed no
 tile. With it, a tornado placed on the developed city crossed it and left
 the map within 5 months.
 
+## Painting
+
+The browser also changes the map in one place outside the simulation,
+while it paints. `getTiles` in `src/animationManager.js` runs on every
+animation frame and shows the next frame of every animated tile on the
+screen, once more than 50 ms have passed since the last change. Fire,
+traffic, smoke, the radar and the other animations only change what is
+painted, and the map keeps its tile. An explosion is
+the exception. When its last frame has been shown, `getTiles` writes a
+random rubble tile to the map. Nothing in the simulation does that, so
+without the painting a bulldozed zone or building, or a tile a tornado,
+monster or wrecked ship destroyed, stayed an explosion for good. An
+explosion counts as developed land in the land value scan, which rubble
+does not.
+
+`stepMonths` does the same in `painting.ts`. Each tick is 3 frames, as
+for the sprites, and each frame moves the sprites and then paints, in the
+order of `commonAnimate` in `src/game.js`. On a 60 Hz screen the frames
+come every 16.7 ms, so more than 50 ms have passed on every fourth frame,
+and the animations move on 3 times in 4 ticks. The bulldozer leaves one
+of the first three frames of the explosion, so a bulldozed zone takes 6
+to 8 steps to turn to rubble, 8 to 11 ticks, as it does on the screen in
+400 to 533 ms. The browser only animates the tiles on the
+screen, and headless the whole map counts. The browser's timer can make
+a change come a frame early now and then, which this ignores. While the
+monster TV is open it shares the animation of the main map, which this
+also ignores.
+
+The rubble tile is drawn from the shared random generator, at a fixed
+point of the tick, so the runs stay reproducible. Explosion tiles only
+come from the bulldozer and from a tornado, monster or ship, so
+`painting.ts` only searches the map at the start of each `stepMonths`
+call and while one of those sprites is on it, and otherwise moves on the
+explosions it knows. Like the browser's paint history, the frames shown
+are not saved, so after a load an explosion starts over.
+`test/painting.test.ts` checks a bulldozed zone, and that two runs with a
+tornado and bulldozing give the same city.
+
 ## Performance
 
 `npm run bench:headless` advances a hard city with disasters on for 20
 years. Over five runs it took between 123 and 131 ms, about 6.3 ms per
 year, measured with Node 24.14.1 on an AMD Ryzen 9 7900X3D on Windows 11.
 Before the sprites moved it took between 122 and 132 ms on the same
-machine, so moving them costs nothing measurable. The map is empty, so a
-developed city does more work per tick and will be slower.
+machine, so moving them costs nothing measurable. With the painting it
+takes between 134 and 141 ms, about 6.8 ms per year, against 126 to 130
+ms the day before. The map is empty, so a developed city does more work
+per tick and will be slower.
 
 ## Things to keep in mind
 
@@ -1011,14 +1044,6 @@ which include trees, parks, roads, rails, power lines, zones and
 buildings, and it goes out much sooner near a fire station. When a fire
 reaches a zone, the rest of the zone becomes bulldozable, which a
 misplaced parenthesis had also broken (change 10).
-
-A bulldozed zone or building, and any tile a tornado or a monster
-destroys, becomes an explosion. Nothing in the simulation ends it: the
-browser turns the tile into rubble when it paints the last frame
-(`getTiles` in `src/animationManager.js`), and only for tiles on the
-screen. Headless nothing paints, so the explosion tiles stay. They count
-as developed land in the land value scan, which rubble does not. The
-tools clear them for $1 like rubble, so they can be built over.
 
 In `src/evaluation.js`, every yearly evaluation of a city with population
 adds 7 entries to a module level array that is never cleared. The array is

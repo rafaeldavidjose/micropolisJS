@@ -4,6 +4,7 @@ import { Simulation } from '../src/simulation.js';
 import { Random } from '../src/random.ts';
 import { answerBudgetWindow } from './budget.ts';
 import { getCensus, getValves, moveSprites } from './engine.ts';
+import { markMapChanged, paintFrame } from './painting.ts';
 import type {
   CensusLike,
   CityState,
@@ -27,10 +28,10 @@ const PHASES_PER_TIME_UNIT: number = 16;
 const TIME_UNITS_PER_MONTH: number = 4;
 const TICKS_PER_MONTH: number = PHASES_PER_TIME_UNIT * TIME_UNITS_PER_MONTH;
 
-/* The browser moves sprites once per animation frame. At medium speed it
- * runs a phase every 50 ms, so a 60 Hz screen gives 3 moves per phase. The
- * original game also makes 3 at medium speed. */
-const SPRITE_MOVES_PER_TICK: number = 3;
+/* The browser moves sprites and paints once per animation frame. At
+ * medium speed it runs a phase every 50 ms, so a 60 Hz screen gives 3
+ * frames per phase. The original game also moves sprites 3 times. */
+const FRAMES_PER_TICK: number = 3;
 
 // The engine keeps no seed, saveCity needs it to make loads reproducible
 const citySeeds: WeakMap<SimulationLike, number> = new WeakMap();
@@ -52,6 +53,9 @@ function stepMonths(city: SimulationLike, monthCount: number,
     afterTick?: (tick: number) => void): void {
   const tickCount: number = monthCount * TICKS_PER_MONTH;
 
+  // Actions run between the calls, and the bulldozer leaves explosions
+  markMapChanged(city);
+
   for (let tick: number = 0; tick < tickCount; tick++) {
     // The engine turns auto budget off in the tick that opens the window
     const autoBudgetWasOn: boolean = city.budget.autoBudget;
@@ -63,8 +67,9 @@ function stepMonths(city: SimulationLike, monthCount: number,
       answerBudgetWindow(city, autoBudgetWasOn);
     }
 
-    for (let move: number = 0; move < SPRITE_MOVES_PER_TICK; move++) {
+    for (let frame: number = 0; frame < FRAMES_PER_TICK; frame++) {
       moveSprites(city);
+      paintFrame(city);
     }
 
     afterTick?.(tick);
