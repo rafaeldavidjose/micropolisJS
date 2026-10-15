@@ -18,6 +18,21 @@ import {
   isRoad,
   siteSize,
 } from './tiles.ts';
+import {
+  DIRECTIONS,
+  centresTouching,
+  cityCentre,
+  closestTile,
+  edgeTiles,
+  indexOf,
+  isOnMap,
+  powerJoins,
+  powerNetwork,
+  siteTiles,
+  sortByDistance,
+  tilesPastRoadEnds,
+  uniqueTiles,
+} from './sites.ts';
 
 type ZoneTool = 'residential' | 'commercial' | 'industrial';
 
@@ -35,14 +50,6 @@ const ROAD_LENGTH: number = 6;
 
 // How many road ends are tried in a turn, each one a full route search
 const ROAD_ENDS_TRIED: number = 20;
-
-// East, south, west, north: the order directions are tried in
-const DIRECTIONS: readonly Position[] = [
-  { x: 1, y: 0 },
-  { x: 0, y: 1 },
-  { x: -1, y: 0 },
-  { x: 0, y: -1 },
-];
 
 /* The view stays as it was at the start of the turn, so the plan keeps
  * what earlier actions of the turn already promised: money, tiles, wired
@@ -67,95 +74,6 @@ interface Choice {
   cost: number;
   tiles: Position[];
   wiredZone: number | null;
-}
-
-function indexOf(map: MapView, x: number, y: number): number {
-  return y * map.width + x;
-}
-
-function isOnMap(map: MapView, x: number, y: number): boolean {
-  return x >= 0 && y >= 0 && x < map.width && y < map.height;
-}
-
-function distanceSquared(from: Position, to: Position): number {
-  return (from.x - to.x) ** 2 + (from.y - to.y) ** 2;
-}
-
-/* Orders tiles by straight-line distance to a target, the closest first.
- * Ties go to the tile higher up the map, then to the one further left. */
-function compareDistance(first: Position, second: Position,
-    target: Position): number {
-  return distanceSquared(first, target) - distanceSquared(second, target) ||
-    first.y - second.y || first.x - second.x;
-}
-
-function sortByDistance<Tile extends Position>(tiles: Tile[],
-    target: Position): Tile[] {
-  return tiles.sort((first: Tile, second: Tile): number =>
-    compareDistance(first, second, target));
-}
-
-function closestTile(tiles: Position[], target: Position): Position {
-  return tiles.reduce((best: Position, tile: Position): Position =>
-    compareDistance(tile, best, target) < 0 ? tile : best);
-}
-
-// A site is placed by its centre tile, one right of and below its corner
-function siteTiles(centre: Position, size: number): Position[] {
-  const tiles: Position[] = [];
-
-  for (let dy: number = -1; dy < size - 1; dy++) {
-    for (let dx: number = -1; dx < size - 1; dx++) {
-      tiles.push({ x: centre.x + dx, y: centre.y + dy });
-    }
-  }
-
-  return tiles;
-}
-
-// The tiles that share an edge with a site, without its corners
-function edgeTiles(centre: Position, size: number): Position[] {
-  const left: number = centre.x - 1;
-  const top: number = centre.y - 1;
-  const tiles: Position[] = [];
-
-  for (let offset: number = 0; offset < size; offset++) {
-    tiles.push({ x: left + offset, y: top - 1 });
-    tiles.push({ x: left + offset, y: top + size });
-    tiles.push({ x: left - 1, y: top + offset });
-    tiles.push({ x: left + size, y: top + offset });
-  }
-
-  return tiles;
-}
-
-// The centres of the sites of a size that have the tile along an edge
-function centresTouching(tile: Position, size: number): Position[] {
-  const centres: Position[] = [];
-
-  for (let offset: number = -size + 2; offset <= 1; offset++) {
-    centres.push({ x: tile.x + 2, y: tile.y + offset });
-    centres.push({ x: tile.x - size + 1, y: tile.y + offset });
-    centres.push({ x: tile.x + offset, y: tile.y + 2 });
-    centres.push({ x: tile.x + offset, y: tile.y - size + 1 });
-  }
-
-  return centres;
-}
-
-function uniqueTiles(map: MapView, tiles: Position[]): Position[] {
-  const seen: Set<number> = new Set();
-
-  return tiles.filter((tile: Position): boolean => {
-    const index: number = indexOf(map, tile.x, tile.y);
-
-    if (!isOnMap(map, tile.x, tile.y) || seen.has(index)) {
-      return false;
-    }
-
-    seen.add(index);
-    return true;
-  });
 }
 
 function isOpenLand(view: CityView, plan: TurnPlan, tile: Position): boolean {
@@ -188,114 +106,6 @@ function isOpenSite(view: CityView, plan: TurnPlan, centre: Position,
   return siteTiles(centre, size).every((tile: Position): boolean =>
     isPassable(view, plan, tile) &&
     !plan.roadEnds.has(indexOf(view.map, tile.x, tile.y)));
-}
-
-// The tile straight past every road tile that has a single road neighbour
-function tilesPastRoadEnds(map: MapView): Set<number> {
-  const past: Set<number> = new Set();
-
-  for (let y: number = 0; y < map.height; y++) {
-    for (let x: number = 0; x < map.width; x++) {
-      if (!isRoad(map.getTileValue(x, y))) {
-        continue;
-      }
-
-      const neighbours: Position[] = DIRECTIONS.filter(
-        (direction: Position): boolean =>
-          isOnMap(map, x + direction.x, y + direction.y) &&
-          isRoad(map.getTileValue(x + direction.x, y + direction.y)));
-
-      if (neighbours.length === 1 &&
-          isOnMap(map, x - neighbours[0].x, y - neighbours[0].y)) {
-        past.add(indexOf(map, x - neighbours[0].x, y - neighbours[0].y));
-      }
-    }
-  }
-
-  return past;
-}
-
-// The centre of the zones and buildings, or of the map before there are any
-function cityCentre(view: CityView): Position {
-  if (view.zones.length === 0) {
-    return { x: (view.map.width - 1) / 2, y: (view.map.height - 1) / 2 };
-  }
-
-  const total: Position = view.zones.reduce(
-    (sum: Position, zone: ZoneView): Position =>
-      ({ x: sum.x + zone.x, y: sum.y + zone.y }), { x: 0, y: 0 });
-
-  return {
-    x: total.x / view.zones.length,
-    y: total.y / view.zones.length,
-  };
-}
-
-/* The tiles power can reach from the plants: their sites and every
- * conducting tile joined to them, as in the power scan but without its
- * limit on how many tiles a plant can feed. */
-function powerNetwork(view: CityView): Set<number> {
-  const map: MapView = view.map;
-  const reached: Set<number> = new Set();
-  const queue: Position[] = [];
-
-  for (const zone of view.zones) {
-    if (!isPowerPlant(zone.tile)) {
-      continue;
-    }
-
-    for (const tile of siteTiles(zone, siteSize(zone.tile))) {
-      if (isOnMap(map, tile.x, tile.y)) {
-        reached.add(indexOf(map, tile.x, tile.y));
-        queue.push(tile);
-      }
-    }
-  }
-
-  while (queue.length > 0) {
-    const tile: Position = queue.pop() as Position;
-
-    for (const direction of DIRECTIONS) {
-      const x: number = tile.x + direction.x;
-      const y: number = tile.y + direction.y;
-
-      if (isOnMap(map, x, y) && !reached.has(indexOf(map, x, y)) &&
-          conducts(map.getTileValue(x, y))) {
-        reached.add(indexOf(map, x, y));
-        queue.push({ x: x, y: y });
-      }
-    }
-  }
-
-  return reached;
-}
-
-/* Where a new power line can take power from the network: on one of its
- * power lines, or on free land next to it. */
-function powerJoins(view: CityView, network: Set<number>): Position[] {
-  const map: MapView = view.map;
-  const joins: Position[] = [];
-
-  for (const index of network) {
-    const tile: Position = { x: index % map.width,
-      y: Math.floor(index / map.width) };
-
-    if (!isBuilding(map.getTileValue(tile.x, tile.y))) {
-      joins.push(tile);
-    }
-
-    for (const direction of DIRECTIONS) {
-      const x: number = tile.x + direction.x;
-      const y: number = tile.y + direction.y;
-
-      if (isOnMap(map, x, y) && !network.has(indexOf(map, x, y)) &&
-          isFreeLand(map.getTileValue(x, y))) {
-        joins.push({ x: x, y: y });
-      }
-    }
-  }
-
-  return uniqueTiles(map, joins);
 }
 
 function zoneIndex(map: MapView, zone: ZoneView): number {

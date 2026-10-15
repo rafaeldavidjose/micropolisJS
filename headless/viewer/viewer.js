@@ -1149,14 +1149,16 @@ function withHelp(node, key) {
 }
 
 /**
- * The fields of an agent report have keys like report.draws. A field the
- * help has no text for gets the general one.
+ * The fields of an agent report have keys like report.draws, explained for
+ * the agent of the log. A field the help has no text for gets the general
+ * one.
  * @param {string} key
  * @returns {string}
  */
 function helpText(key) {
   if (key.startsWith('report.')) {
-    return REPORT_HELP[key.slice('report.'.length)] ?? HELP.report;
+    return REPORT_HELP[run?.log.agent.name ?? '']
+      ?.[key.slice('report.'.length)] ?? HELP.report;
   }
 
   return HELP[key] ?? '';

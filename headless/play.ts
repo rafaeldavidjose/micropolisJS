@@ -14,6 +14,7 @@ import { createDemoAgent } from './agents/demo.ts';
 import { createGreedyAgent } from './agents/greedy.ts';
 import { passiveAgent } from './agents/passive.ts';
 import { createRandomAgent } from './agents/random.ts';
+import { createRulesAgent } from './agents/rules.ts';
 import type { Agent, RunLog, TurnLog } from './types.ts';
 
 const RUNS: string = join(dirname(fileURLToPath(import.meta.url)), '..',
@@ -84,8 +85,12 @@ function makeAgent(name: string, seed: number): Agent {
     return createGreedyAgent();
   }
 
+  if (name === 'rules') {
+    return createRulesAgent();
+  }
+
   throw new Error('Unknown agent ' + name +
-    ', use random, greedy, passive or demo');
+    ', use random, rules, greedy, passive or demo');
 }
 
 if (!(values.level in LEVELS)) {

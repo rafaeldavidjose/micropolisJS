@@ -139,30 +139,58 @@ const HELP = {
     'value of the game. The dot is the current turn.',
 };
 
-/** @type {Record<string, string>} */
+/**
+ * The fields of each agent's report, by the agent's name in the log.
+ * @type {Record<string, Record<string, string>>}
+ */
 const REPORT_HELP = {
   // random.ts TurnReport
-  slots: 'How many actions the random agent tried to play this turn, ' +
-    'drawn from 0 to the action limit.',
-  nothing: 'Slots in which it drew the category "nothing".',
-  draws: 'Actions it drew and quoted this turn, the rejected ones included.',
-  rejected: 'Draws it dropped because the quote failed or the money left ' +
-    'was not enough.',
-  reasons: 'Why the rejected draws failed, with a count for each reason.',
-  gaveUp: 'Slots left empty after too many rejected draws, 20 by default.',
+  random: {
+    slots: 'How many actions the random agent tried to play this turn, ' +
+      'drawn from 0 to the action limit.',
+    nothing: 'Slots in which it drew the category "nothing".',
+    draws: 'Actions it drew and quoted this turn, the rejected ones ' +
+      'included.',
+    rejected: 'Draws it dropped because the quote failed or the money ' +
+      'left was not enough.',
+    reasons: 'Why the rejected draws failed, with a count for each reason.',
+    gaveUp: 'Slots left empty after too many rejected draws, 20 by default.',
+  },
 
   // greedy.ts
-  rules: 'The rules the greedy agent played this turn, in order: 1 a first ' +
-    'power plant, 2 a power line to a zone the network does not reach, 3 ' +
-    'another plant for an overloaded network, 4 a zone or a new road for ' +
-    'the highest demand.',
-  waitingForMoney: 'True when the greedy agent stopped because the next ' +
-    'action cost more than the money left.',
+  greedy: {
+    rules: 'The rules the greedy agent played this turn, in order: 1 a ' +
+      'first power plant, 2 a power line to a zone the network does not ' +
+      'reach, 3 another plant for an overloaded network, 4 a zone or a new ' +
+      'road for the highest demand.',
+    waitingForMoney: 'True when the greedy agent stopped because the next ' +
+      'action cost more than the money left.',
+  },
+
+  // rules.ts
+  rules: {
+    rules: 'The rule behind each action of this turn, in order. Power: ' +
+      'first-plant, connect-zone, extra-plant. Budget: funding, ' +
+      'auto-budget. Maintenance: repair-road. Then police, fire-station, ' +
+      'stadium, airport or port for a capped demand, raise-tax or ' +
+      'lower-tax, rezone, demolish-empty and demolish-polluter, and for ' +
+      'growth zone and road.',
+    reserve: 'The money the agent kept this turn for the next yearly ' +
+      'budget: its full cost by the formula of the engine, $1 a road tile, ' +
+      '$5 a bridge, $1 more under heavy traffic and $2 a rail tile, times ' +
+      'the level, and $100 a police or fire station, plus 25%. Actions ' +
+      'that cost money only use what is above it.',
+    waitingForMoney: 'True when a rule fitted but its action cost more ' +
+      'than the money above the reserve. The agent then waits: the rest ' +
+      'of the turn only sets the budget and the taxes.',
+  },
 
   // demo.ts
-  next: 'The number of the next step in the demo town plan.',
-  skipped: 'Steps of the plan the demo agent skipped, because the engine ' +
-    'refused them for a reason other than money.',
+  demo: {
+    next: 'The number of the next step in the demo town plan.',
+    skipped: 'Steps of the plan the demo agent skipped, because the engine ' +
+      'refused them for a reason other than money.',
+  },
 };
 
 export { HELP, REPORT_HELP };

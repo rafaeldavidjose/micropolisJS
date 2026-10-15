@@ -34,14 +34,15 @@ npm run replay -- runs/run.json # opens the replay viewer on a run log
 ```
 
 `play:headless` plays one game and writes its run log. The options are
-`--agent` (`random`, `greedy`, `passive` or `demo`), `--seed` for the
-city, `--agent-seed` (the city seed if left out), `--level` (`easy`,
-`medium` or `hard`), `--disasters` (`on` or `off`), `--turns`, `--months`
-for the months per turn, `--max-actions` and `--out`. Left out, they take
-the defaults of `runGame`. A bare file name for `--out`, like the default
-`run.json`, goes into `runs/` at the root of the repository, which git
-ignores. A path with a folder is used as it is. It prints the final
-population and funds, and where the log went, when it is done.
+`--agent` (`random`, `rules`, `greedy`, `passive` or `demo`), `--seed`
+for the city, `--agent-seed` (the city seed if left out), `--level`
+(`easy`, `medium` or `hard`), `--disasters` (`on` or `off`), `--turns`,
+`--months` for the months per turn, `--max-actions` and `--out`. Left
+out, they take the defaults of `runGame`. A bare file name for `--out`,
+like the default `run.json`, goes into `runs/` at the root of the
+repository, which git ignores. A path with a folder is used as it is. It
+prints the final population and funds, and where the log went, when it
+is done.
 
 The tests use `node:test` because the project's Jest setup only covers
 `src/` and `test/`. `npm test` still runs the engine's own Jest tests.
@@ -530,6 +531,139 @@ road quoted at the start of a turn can also fail when it is applied, if
 a power line laid earlier in the same turn takes the tiles its route
 needed.
 
+## Rule-based agent
+
+```ts
+import { createRulesAgent } from './agents/rules.ts';
+
+const log: RunLog = await runGame(createRulesAgent(), { seed: 1 });
+```
+
+The rule-based agent deals with all the problems of the city and can
+demolish. Each turn, up to the action limit and while the money lasts,
+it plays the first of these rules that fits, then checks them again:
+
+1. Power, the three rules of the greedy agent: a first coal plant, a
+   power line to a zone the network does not reach, and another coal
+   plant when the network cannot feed its zones.
+2. Budget: when one of the three funding shares is below 100% and the
+   money covers the reserve, all three go back to 100%. When auto budget
+   is off and the money covers the reserve, auto budget goes back on.
+3. Maintenance: road tiles that turned to rubble and bridges that fell
+   back to water are rebuilt.
+4. Crime: with average crime above 50, a police station near the
+   developed block with the most crime that no police station covers.
+5. Fire: a fire station where it covers the most developed blocks that
+   no fire station covers, if that is at least 80 blocks.
+6. Capped demand: a stadium, an airport or a seaport when the census
+   passes the threshold at which the engine caps that demand, and the
+   city has none.
+7. Taxes: 1 lower when money piles up and taxes are among the three
+   worst problems, 1 higher when the city cannot pay its yearly budget,
+   always between 5 and 9 and at most once a year.
+8. Demolition: a zone on a site it cleared earlier, then a zone that
+   stayed empty with power and a road for 75 months while its type had
+   negative demand, then an industrial zone or a coal plant next to
+   homes when that cuts neither jobs nor power.
+9. Growth, as the greedy agent, but homes never go next to industry,
+   power plants, the seaport or the airport, and those never go next to
+   homes.
+
+It always keeps a reserve for the next yearly budget: the full yearly
+cost by the formulas of `collectTax` in `src/budget.js`, counted on the
+map, plus 25%. That is $1 a road tile, $5 a bridge, $1 more under heavy
+traffic and $2 a rail tile, times 0.7, 0.9 or 1.2 by level, and $100 a
+police or fire station. Actions that cost money only spend what is above
+the reserve. A rule that fits but costs more makes the agent wait: for
+the rest of the turn it only plays the free rules, the budget and the
+taxes, so it saves up for what the rule needs. The capped demand rule is
+the exception and builds only when the money is there. Saving for a
+stadium of $5,000 or an airport of $10,000 held up all growth for the
+last ten years of some easy games.
+
+The view has no coverage maps, since the browser shows none (see the
+view above). The agent counts a block as covered when a station has its
+centre within 12 tiles of the middle of the block. In the engine a
+station adds its effect to its block of 8 by 8 tiles, and three
+smoothing passes spread it. At full funding about 22% of the effect stays
+in the station's block, 11% reaches each of the four blocks next to it,
+and 5% or less the ones beyond. 12 tiles is about the station's block and
+the four next to it. A developed block is one with a land value, as in
+the engine's crime scan. The police station goes on a site next to a road
+that would cover the block, and the agent tries the 10 worst blocks.
+
+The census thresholds come from `_sendMessages` in `src/simulation.js`:
+more than 500 residents without a stadium, more than 100 commercial
+without an airport, more than 70 industrial without a seaport. The agent
+works out the census counts from the zone centres in the view, with the
+formulas of `getZonePopulation`, which read them from the tile number.
+The building goes on the site next to a road closest to the city centre.
+
+Money piles up when the funds are $10,000 above the reserve. Taxes are
+among the worst problems when fewer than three of the seven problems are
+higher, ties going to the one listed first in the state. The city cannot
+pay its yearly budget when the last January paid less than full funding,
+from the budget log, or when the funds and the taxes of the next January
+fall short of the yearly cost. The taxes come from the formula of
+`collectTax`, with the land value average taken from the housing problem,
+which is that average times 7 / 10. The $20,000 a new city starts with
+count as piled up, so the rate goes from 7 to 5 in the first two years.
+
+A zone is empty when it adds nothing to the census. The agent remembers
+since when each empty zone has had power and a road next to it. Such a
+zone is bulldozed in one turn and rezoned in a later one, because a
+quote at the start of the turn cannot see the cleared site. The site
+then takes the zone type with the highest demand that may go there, and
+waits while there is none. Industry next to homes goes only while the
+city keeps a job for every resident without it, as unemployment counts
+them: residents at most 8 times commercial and industrial together. A
+coal plant goes only while the other plants, one of them with power,
+still reach every zone the network reaches now and can feed every tile
+of the network without it: 700 tiles a coal plant and 2,000 a nuclear
+one, as the power scan counts them. Two sites are next to each other
+with at most one tile between them, so a road between them still
+counts. Since growth keeps homes and polluters apart, this last rule has
+little to do in the agent's own cities. It is there for cities the agent
+takes over.
+
+The agent remembers every road tile it has seen, so it can find the
+ones that broke. A straight run of broken tiles is rebuilt as one route
+when `planRoute` lays exactly those tiles, and otherwise each tile is a
+route from the tile to itself. A drawbridge opens for a ship and leaves
+water where its road was, with its raised halves at most two tiles away
+(`doBridge` in `src/road.js`). Water counts as a fallen bridge only
+without them, or the agent would lay a bridge in the channel.
+
+A bulldozed zone or building leaves explosion tiles, and so does a
+tornado or a monster on any tile. micropolisJS only turns them into
+rubble when the browser paints them (`getTiles` in
+`src/animationManager.js`), so headless they stay. The tools clear them
+for $1, like rubble, and the agent counts them as land it can build on,
+and on a road tile as a road to rebuild.
+
+The 75 months come from the greedy agent's 20 year games after the crime
+and traffic fixes, seeds 1 to 10, on hard with disasters and on easy
+without. Of the 3,213 times an empty zone with power and a road went on
+to develop, half did so within a year, 90% within 4.5 years, 95% within
+75 months and 99% within 10.5 years. Another 888 zones were still empty
+at the end of a game.
+
+All thresholds and margins are named constants at the top of
+`agents/rules.ts` and are provisional. They were tuned on seeds 1001 to
+1020, on hard with disasters and on easy without, so seeds 1 to 10 stay
+for reporting. The fire threshold mattered most. At 40 blocks the agent
+built two or three fire stations a game, and on hard that cost about a
+third of the population: a station costs $100 a year, and in
+micropolisJS fire never spreads. At 80 it builds one in a few games.
+
+Ties and orders are fixed. Distances are straight lines, and ties go to
+the tile higher up the map, then to the one further left. Directions are
+tried east, south, west, north, and the zone types in the order
+residential, commercial, industrial. Like every agent it only gives the
+two ends of a route, quotes every action and draws no random numbers.
+Its report in each turn of the log lists the rule behind each action,
+the reserve it kept and whether it waited for money.
+
 ## Demo agent
 
 ```ts
@@ -883,6 +1017,14 @@ destination. That is fixed for the same reason (`CHANGES.md`, change 6).
 Busy roads now get a traffic density. Their tiles show light or heavy
 traffic, heavy traffic counts double for road maintenance, traffic tiles
 add pollution, and the traffic problem is above 0.
+
+A bulldozed zone or building, and any tile a tornado or a monster
+destroys, becomes an explosion. Nothing in the simulation ends it: the
+browser turns the tile into rubble when it paints the last frame
+(`getTiles` in `src/animationManager.js`), and only for tiles on the
+screen. Headless nothing paints, so the explosion tiles stay. They count
+as developed land in the land value scan, which rubble does not. The
+tools clear them for $1 like rubble, so they can be built over.
 
 In `src/evaluation.js`, every yearly evaluation of a city with population
 adds 7 entries to a module level array that is never cleared. The array is
