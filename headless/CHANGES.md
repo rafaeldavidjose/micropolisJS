@@ -11,7 +11,7 @@ in changes 1 to 4 below. Game bugs, porting bugs from the original
 Micropolis included, are documented under "Known porting bugs" at the end
 and left as they are. The exception is a bug that removes part of what the
 experiment measures, like the crime scan and the traffic in changes 5
-and 6.
+and 6, and fire in changes 9 and 10.
 
 ## Engine changes
 
@@ -201,6 +201,59 @@ for road maintenance, traffic tiles add pollution, and the traffic problem
 is above 0. In the demo town on seed 1, 16 of its 44 road tiles show
 traffic after 10 years and the traffic problem is 26.
 `headless/test/traffic.test.ts` checks a trip and the density.
+
+### 9. src/miscTiles.js: fire never spread
+
+A burning tile tries to set each of its four neighbours on fire.
+`fireFound` read the tile at `x, y`, the burning tile itself, instead of
+the neighbour at `xTem, yTem`. A fire tile has no burn flag, so the check
+always failed and fire never spread: a fire set in the middle of a forest
+burnt out as a single tile. The rest of that block was never reached and
+had three more bugs. `fireZone` was called with `x, y`.
+`map.setTo(tileUtils.randomFire())` had no coordinates, and `tileUtils` is
+not defined in the file, whose import is `TileUtils`, so the line would
+have thrown. And `makeExplosionAt`, which takes pixels, got tile
+coordinates.
+
+The block now reads the neighbour, passes it to `fireZone`, sets it on fire
+with `map.setTo(xTem, yTem, TileUtils.randomFire())`, and puts the
+explosion at `(xTem << 4) + 8, (yTem << 4) + 8`. That is the original,
+`s_sim.c` lines 927 to 944:
+
+```c
+  for (z = 0; z < 4; z++) {
+    if (!(Rand16() & 7)) {
+      Xtem = SMapX + DX[z];
+      Ytem = SMapY + DY[z];
+      if (TestBounds(Xtem, Ytem)) {
+	c = Map[Xtem][Ytem];
+	if (c & BURNBIT) {
+	  if (c & ZONEBIT) {
+	    FireZone(Xtem, Ytem, c);
+	    if ((c & LOMASK) > IZB)  { /*  Explode  */
+	      MakeExplosionAt((Xtem <<4) + 8, (Ytem <<4) + 8);
+	    }
+	  }
+	  Map[Xtem][Ytem] = FIRE + (Rand16() & 3) + ANIMBIT;
+	}
+      }
+    }
+  }
+```
+
+`doFire` in MicropolisCore (`simulate.cpp`) is the same. The rest of
+`fireFound` already matched both: it runs one time in four (`s_sim.c`
+line 709), and the fire goes out with a chance that depends on the fire
+station map, 1 in 2 above 100, 1 in 3 above 20, 1 in 4 above 0 and 1 in
+11 with no station near (lines 945 to 953). The four bugs are in the same
+few lines and only make sense fixed together, so they are one change.
+
+Fire stations did almost nothing without it, since a fire went out on its
+own before it could grow, so this falls under the same exception as
+changes 5 and 6. `headless/test/fire.test.ts` lights the middle of a
+forest on five maps. A year later 102 tiles have burnt in all, and 13 with
+a powered fire station north of the forest. Before the fix it was one tile
+for each fire in both cases.
 
 ## Configuration changes
 
@@ -516,41 +569,6 @@ original only does it with disasters on, `w_sprite.c` lines 897 to 909:
   }
 ```
 
-### Disasters: fire never spreads
-
-A burning tile should set its burnable neighbours on fire. `fireFound` in
-`src/miscTiles.js` reads the tile at `x, y`, the burning tile itself,
-instead of the neighbour at `xTem, yTem`. A fire tile has no burn flag, so
-the check always fails and fire never spreads. A fire set in the middle of
-a forest is still a single tile after 6 months. The rest of that block is
-never reached and has three more bugs: `fireZone` is called with `x, y`,
-`map.setTo(tileUtils.randomFire())` has no coordinates and `tileUtils` is
-not defined in the file, and `makeExplosionAt`, which takes pixels, gets
-tile coordinates.
-
-The original, `s_sim.c` lines 927 to 944:
-
-```c
-  for (z = 0; z < 4; z++) {
-    if (!(Rand16() & 7)) {
-      Xtem = SMapX + DX[z];
-      Ytem = SMapY + DY[z];
-      if (TestBounds(Xtem, Ytem)) {
-	c = Map[Xtem][Ytem];
-	if (c & BURNBIT) {
-	  if (c & ZONEBIT) {
-	    FireZone(Xtem, Ytem, c);
-	    if ((c & LOMASK) > IZB)  { /*  Explode  */
-	      MakeExplosionAt((Xtem <<4) + 8, (Ytem <<4) + 8);
-	    }
-	  }
-	  Map[Xtem][Ytem] = FIRE + (Rand16() & 3) + ANIMBIT;
-	}
-      }
-    }
-  }
-```
-
 ### Disasters: a burning zone
 
 `fireZone` in `src/zoneUtils.js` differs from the original `FireZone`,
@@ -566,6 +584,5 @@ bulldozable. The original:
 
 The port also uses a zone size of 3 instead of 4 for ports and the other
 large buildings, and clamps the growth rate where the original does not.
-Spreading floods (`doFlood`) reach it, and tornadoes and monsters through
-`destroyMapTile`. The call in `fireFound` is never reached, because fire
-does not spread.
+Spreading floods (`doFlood`) reach it, tornadoes and monsters through
+`destroyMapTile`, and since change 9 a fire that spreads to a zone.

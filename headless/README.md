@@ -17,7 +17,8 @@ The runner must behave like micropolisJS in the browser. `src/` is only
 changed when something stops the game from running headless. Game bugs,
 also porting bugs from the original Micropolis, are left as they are and
 listed under "Known porting bugs" in `CHANGES.md`, with the original
-lines.
+lines. The exception is a bug that removes part of what the experiment
+measures: crime, traffic and fire spreading were fixed for that reason.
 
 ## Running
 
@@ -607,8 +608,8 @@ All thresholds and margins are named constants at the top of
 1020, on hard with disasters and on easy without, so seeds 1 to 10 stay
 for reporting. The fire threshold mattered most. At 40 blocks the agent
 built two or three fire stations a game, and on hard that cost about a
-third of the population: a station costs $100 a year, and in
-micropolisJS fire never spreads. At 80 it builds one in a few games.
+third of the population: a station costs $100 a year, and fire did not
+spread at the time. At 80 it builds one in a few games.
 
 Ties and orders are fixed. Distances are straight lines, and ties go to
 the tile higher up the map, then to the one further left. Directions are
@@ -984,12 +985,12 @@ problems at 250 instead of 256. For an agent this means the score rewards
 a population that does not dip just before January more than it rewards
 good services, and it is noisy from year to year.
 
-The disasters have six more, also described there. A flood can start on
-any bulldozable tile next to water but never on bare land without flags.
-Planes never collide. An explosion lights only its own tile instead of
-that tile and the four diagonal neighbours. Ships wreck on land with
-disasters off. Fire never spreads. And a burning or flooded zone marks
-the wrong tiles bulldozable.
+The disasters have five more, also described there. A flood can start
+on any bulldozable tile next to water but never on bare land without
+flags. Planes never collide. An explosion lights only its own tile
+instead of that tile and the four diagonal neighbours. Ships wreck on
+land with disasters off. And a burning or flooded zone marks the wrong
+tiles bulldozable.
 
 Crime was always 0, because the crime scan never ran. That bug is fixed,
 as an exception to the rule for `src/`, since it removed one of the seven
@@ -1002,6 +1003,13 @@ destination. That is fixed for the same reason (`CHANGES.md`, change 6).
 Busy roads now get a traffic density. Their tiles show light or heavy
 traffic, heavy traffic counts double for road maintenance, traffic tiles
 add pollution, and the traffic problem is above 0.
+
+Fire never spread either: a burning tile checked itself instead of its
+neighbours, so every fire went out on its own tile and fire stations had
+almost nothing to do. That is fixed for the same reason (`CHANGES.md`,
+change 9). A fire now spreads to the tiles next to it that can burn,
+which include trees, parks, roads, rails, power lines, zones and
+buildings, and it goes out much sooner near a fire station.
 
 A bulldozed zone or building, and any tile a tornado or a monster
 destroys, becomes an explosion. Nothing in the simulation ends it: the

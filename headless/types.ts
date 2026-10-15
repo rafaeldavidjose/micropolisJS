@@ -78,11 +78,13 @@ interface TileLike {
   isZone(): boolean;
 }
 
+// setTo takes a Tile from src/tile.ts, which only the tests use
 interface MapLike {
   width: number;
   height: number;
   getTile(x: number, y: number): TileLike;
   getTileValue(x: number, y: number): number;
+  setTo(x: number, y: number, tile: unknown): void;
 }
 
 // Only what the runner and the tornado test use

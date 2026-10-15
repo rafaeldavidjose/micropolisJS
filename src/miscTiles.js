@@ -32,20 +32,20 @@ var fireFound = function(map, x, y, simData) {
       var yTem = y + yDelta[i];
 
       if (map.testBounds(xTem, yTem)) {
-        var tile = map.getTile(x, y);
+        var tile = map.getTile(xTem, yTem);
         if (!tile.isCombustible())
             continue;
 
         if (tile.isZone()) {
-          // Neighbour is a ione and burnable
-          ZoneUtils.fireZone(map, x, y, simData.blockMaps);
+          // Neighbour is a zone and burnable
+          ZoneUtils.fireZone(map, xTem, yTem, simData.blockMaps);
 
-          // Industrial zones etc really go boom
+          // Industrial zones etc really go boom. The explosion takes pixels
           if (tile.getValue() > IZB)
-            simData.spriteManager.makeExplosionAt(x, y);
+            simData.spriteManager.makeExplosionAt((xTem << 4) + 8, (yTem << 4) + 8);
         }
 
-        map.setTo(tileUtils.randomFire());
+        map.setTo(xTem, yTem, TileUtils.randomFire());
       }
     }
   }
