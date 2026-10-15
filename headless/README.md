@@ -624,6 +624,24 @@ wired and the sites it has used. A road quoted at the start of a turn
 can still fail when it is applied, if a power line laid earlier in the
 same turn takes the tiles its route needed.
 
+In a sanity run on seeds 1 to 10, 20 years each, the agent ended with
+7,848 people on average on hard with disasters, against 7,872 for the
+greedy agent, and with 28,504 on easy without disasters, against 24,090.
+Crime averaged 44 and 54 over the turns, against 51 and 98. Budget
+windows opened in 96 years on hard against 118, and in none on easy. No
+action failed. Its weak point is money. It lowers the tax to 5% in the
+first two years, and by 1907 to 1911 the $20,000 of a new city are gone.
+From then on it waits for money in most turns, and in the second half of
+a game it plays nothing in 26 to 40 of its 40 turns. On easy the tax
+stays at 5%, since it only goes up when the city cannot pay its budget,
+and residential demand is capped once the census passes 500 residents.
+On hard the tax reaches 9%, too late for some cities: seed 1 could not
+pay its budget in 1909, its funding stayed cut because its money never
+got back above the reserve, and it ended with 2,820 people. Many homes
+stay empty at the end, 5 to 23 zones on easy and 15 to 30 on hard, where
+the demolition rule needs another type in demand and money above the
+reserve.
+
 This agent replaced the greedy agent, which only had the power and the
 growth rules and ignored crime, fire, taxes and the budget. Git history
 keeps it, last in commit `ceb8207`. In its first version every new road
