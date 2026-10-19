@@ -529,6 +529,18 @@ power lines or free land next to it, to the tile next to the zone
 closest to that point. The second plant is for zones the network does
 reach.
 
+The 700 of a coal plant and the 2,000 of a nuclear plant are steps of the
+power scan, not tiles. The scan counts a tile again each time it comes
+back to it from its stack where the network branches, so how many tiles a
+plant powers depends on the layout: 700 on a straight power line, 646 to
+700 in dense blocks of zones, and about 450 to 560 in this agent's
+cities, which take 1.56 steps per tile on average. The original
+(`DoPowerScan` in `s_power.c`) and MicropolisCore count the same way,
+though MicropolisCore's comment calls them tiles. I compiled the original
+function and ran it on the same maps, with identical results. So nothing
+that tells an agent, an LLM included, how many tiles a plant powers
+should say 700.
+
 A new road goes to land the agent can build on. Its end is the free
 tile next to an open zone site that no road touches yet and that can
 take the zone, closest to the city centre. It starts on the road tile
