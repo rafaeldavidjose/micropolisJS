@@ -165,7 +165,7 @@ function cityCentre(view: CityView): Position {
 
 /* The tiles power can reach from the plants: their sites and every
  * conducting tile joined to them, as in the power scan but without its
- * limit on how many tiles a plant can feed. Tiles in blocked conduct
+ * limit on how many steps a plant can feed. Tiles in blocked conduct
  * nothing, which shows what a network would be without them. */
 function powerNetwork(view: CityView,
     blocked: Set<number> = new Set()): Set<number> {

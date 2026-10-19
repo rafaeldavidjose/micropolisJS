@@ -109,17 +109,24 @@ const EMPTY_ZONE_MONTHS: number = 75;
 // Two sites count as next to each other with at most this many tiles between
 const NEXT_TO_GAP: number = 1;
 
+/* The tiles a plant surely powers, for the demolition rule. Not the 700
+ * and 2,000 of src/powerManager.js: those are steps of the power scan,
+ * which counts a tile again each time it comes back to it where the
+ * network branches. A coal plant that ran short in this agent's cities
+ * powered 450 tiles at the least. No city built a nuclear plant, so its
+ * figure is the same share of its 2,000 steps. */
+const COAL_PLANT_TILES: number = 450;
+const NUCLEAR_PLANT_TILES: number = 1280;
+
 /* Fixed numbers of the engine. The census thresholds come from
  * _sendMessages in src/simulation.js, which caps the demand, and the costs
- * from src/budget.js and src/powerManager.js. */
+ * from src/budget.js. */
 const STADIUM_RESIDENTS: number = 500;
 const AIRPORT_COMMERCE: number = 100;
 const SEAPORT_INDUSTRY: number = 70;
 const ROAD_COST_BY_LEVEL: readonly number[] = [0.7, 0.9, 1.2];
 const TAX_INCOME_BY_LEVEL: readonly number[] = [1.4, 1.2, 0.8];
 const STATION_COST: number = 100;
-const COAL_POWER: number = 700;
-const NUCLEAR_POWER: number = 2000;
 
 const ZONE_TOOLS: readonly ZoneKind[] = [
   'residential',
@@ -1216,17 +1223,16 @@ function demolishEmptyZone(view: CityView, plan: TurnPlan,
   return null;
 }
 
-function plantPower(zone: ZoneView): number {
+function plantTiles(zone: ZoneView): number {
   if (zone.tile === POWERPLANT) {
-    return COAL_POWER;
+    return COAL_PLANT_TILES;
   }
 
-  return zone.tile === NUCLEAR ? NUCLEAR_POWER : 0;
+  return zone.tile === NUCLEAR ? NUCLEAR_PLANT_TILES : 0;
 }
 
 /* Without the plant, the other plants still reach every zone the network
- * reaches now, and they can feed every tile of their network, as the power
- * scan counts it. */
+ * reaches now, and they can surely power every tile of their network. */
 function canRemovePlant(view: CityView, plant: ZoneView,
     network: Set<number>): boolean {
   const others: ZoneView[] = view.zones.filter((zone: ZoneView): boolean =>
@@ -1235,7 +1241,7 @@ function canRemovePlant(view: CityView, plant: ZoneView,
     .map((tile: Position): number => indexOf(view.map, tile.x, tile.y)));
   const without: Set<number> = powerNetwork(view, site);
   const capacity: number = others.reduce(
-    (sum: number, zone: ZoneView): number => sum + plantPower(zone), 0);
+    (sum: number, zone: ZoneView): number => sum + plantTiles(zone), 0);
 
   return others.some((zone: ZoneView): boolean => zone.powered) &&
     without.size <= capacity &&
@@ -1489,6 +1495,8 @@ function createRulesAgent(): Agent {
       taxMin: TAX_MIN,
       emptyZoneMonths: EMPTY_ZONE_MONTHS,
       nextToGap: NEXT_TO_GAP,
+      coalPlantTiles: COAL_PLANT_TILES,
+      nuclearPlantTiles: NUCLEAR_PLANT_TILES,
     }),
     report: (): Record<string, unknown> => report,
     decide: (view: CityView): GameAction[] => {

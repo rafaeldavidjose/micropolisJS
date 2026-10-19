@@ -523,7 +523,7 @@ a line.
 The network is every tile power can reach from a plant through tiles
 that conduct: power lines, the road and rail crossings that carry them,
 and zones and buildings. That is the path of the power scan, without
-its limit on how many tiles a plant feeds. The power line of rule 1 runs
+its limit on how many steps a plant feeds. The power line of rule 1 runs
 from the point of the network closest to the zone, which is one of its
 power lines or free land next to it, to the tile next to the zone
 closest to that point. The second plant is for zones the network does
@@ -605,13 +605,16 @@ waits while there is none. Industry next to homes goes only while the
 city keeps a job for every resident without it, as unemployment counts
 them: residents at most 8 times commercial and industrial together. A
 coal plant goes only while the other plants, one of them with power,
-still reach every zone the network reaches now and can feed every tile
-of the network without it: 700 tiles a coal plant and 2,000 a nuclear
-one, as the power scan counts them. Two sites are next to each other
-with at most one tile between them, so a road between them still
-counts. Since growth keeps homes and polluters apart, this last rule has
-little to do in the agent's own cities. It is there for cities the agent
-takes over.
+still reach every zone the network reaches now and can surely power
+every tile of the network without it: 450 tiles a coal plant and 1,280
+a nuclear one. The 700 and 2,000 of the engine are steps of the power
+scan, not tiles (see the power paragraph above). A coal plant that ran
+short in this agent's cities powered 450 tiles at the least, and 1,280
+is the same share of a nuclear plant's 2,000 steps. Two sites are next
+to each other with at most one tile between them, so a road between
+them still counts. Since growth keeps homes and polluters apart, this
+last rule has little to do in the agent's own cities. It is there for
+cities the agent takes over.
 
 The agent remembers every road tile it has seen, so it can find the
 ones that broke. A straight run of broken tiles is rebuilt as one route
@@ -671,9 +674,9 @@ left out, since none scored better: a limit on the empty zones of a type
 before zoning more of it, from 1 to 20 (1.06 to 2.75), and cutting police
 and fire funding while the city is broke and at a loss (2.53 to 2.66).
 The third power rule turned out to build its plant when it should. The
-engine's power scan counts about 1.5 steps per tile, since it comes back
-to every tile where the network branches, so a coal plant runs short at
-about 450 to 500 tiles, not 700.
+engine's power scan counts about 1.56 steps per tile, since it comes
+back to every tile where the network branches, so a coal plant runs short
+at about 450 to 560 tiles, not 700.
 
 Ties and orders are fixed. Distances are straight lines, and ties go to
 the tile higher up the map, then to the one further left. Directions are
