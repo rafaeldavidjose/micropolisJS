@@ -116,6 +116,11 @@ function getState(city: SimulationLike): CityState {
       commercial: valves.comValve,
       industrial: valves.indValve,
     },
+    caps: {
+      residential: valves.resCap,
+      commercial: valves.comCap,
+      industrial: valves.indCap,
+    },
     problems: {
       crime: census.crimeAverage,
       pollution: census.pollutionAverage,

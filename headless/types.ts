@@ -45,6 +45,9 @@ interface ValvesLike {
   resValve: number;
   comValve: number;
   indValve: number;
+  resCap: boolean;
+  comCap: boolean;
+  indCap: boolean;
 }
 
 interface DisasterManagerLike {
@@ -403,6 +406,14 @@ interface CityState {
     residential: number;
     commercial: number;
     industrial: number;
+  };
+  /* Whether the engine holds each demand at 0 or below for want of a
+   * stadium, an airport or a seaport, the condition of its "Residents
+   * demand a Stadium" messages. It checks once every 64 time units. */
+  caps: {
+    residential: boolean;
+    commercial: boolean;
+    industrial: boolean;
   };
   problems: {
     crime: number;

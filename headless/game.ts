@@ -49,7 +49,7 @@ import type {
   ZoneView,
 } from './types.ts';
 
-const LOG_VERSION: number = 4;
+const LOG_VERSION: number = 5;
 
 /* Sprites move 3 times per tick. A tornado moves about 2 pixels a move
  * and a train 4, so with a sample every time unit (16 ticks) a tornado

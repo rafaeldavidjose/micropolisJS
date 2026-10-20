@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createCity, stepMonths, Simulation } from '../runner.ts';
-import { getMap } from '../engine.ts';
+import { createCity, getState, stepMonths, Simulation } from '../runner.ts';
+import { getMap, getValves } from '../engine.ts';
 import { hashCity } from '../hash.ts';
 import { applyAction, runGame, writeRunLog } from '../game.ts';
 import { passiveAgent } from '../agents/passive.ts';
@@ -28,6 +28,7 @@ import type {
   SpriteRecord,
   SpriteSample,
   TurnLog,
+  ValvesLike,
   ZoneView,
 } from '../types.ts';
 
@@ -217,6 +218,24 @@ test('game: an agent can answer with a promise', async (): Promise<void> => {
 
   assert.deepEqual(await runGame(waiting, options),
     await runGame(scriptedAgent(FIRST_TURN), options));
+});
+
+/* _sendMessages sets the flags in the branch that sends "Residents demand
+ * a Stadium" and the like, so the state reads them as they are. */
+test('game: the state has the demand caps of the engine', (): void => {
+  const city: SimulationLike = createCity({
+    seed: SEED, level: Simulation.LEVEL_EASY, disasters: false,
+  });
+  const valves: ValvesLike = getValves(city);
+
+  assert.deepEqual(getState(city).caps,
+    { residential: false, commercial: false, industrial: false });
+
+  valves.resCap = true;
+  valves.indCap = true;
+
+  assert.deepEqual(getState(city).caps,
+    { residential: true, commercial: false, industrial: true });
 });
 
 test('game: the log is written as JSON', async (): Promise<void> => {

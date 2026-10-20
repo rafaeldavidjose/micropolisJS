@@ -196,7 +196,7 @@ The map is stored row by row as raw tile values, with the flag bits of `src/tile
 
 Sprites are trains, helicopters, planes, ships, monsters, tornadoes and explosions. While the city runs through a turn, the log reads the sprite list every 4 ticks, so 48 times in a turn of 3 months. A sample is `[n, sprites]`, where `n` counts the samples from 1 at 4 ticks into the turn, and every sprite is `[type, frame, left, top]`: the type from `src/spriteConstants.ts`, the frame, and the top left corner of its image in map pixels, as the browser draws it. Only samples with a sprite are kept, and `spriteSampling` at the top of the log has the rate. Sprites move 3 times per tick, about 2 pixels a move for a tornado and 4 for a train. With a sample every time unit (16 ticks) a tornado would jump 6 tiles between samples and a train 12. Every 4 ticks they move about 1.5 and 3 tiles. A tornado is often there for several turns, until it leaves the map. The sprites add 0 to 6 kB to a 20 year demo game with disasters on. Reading the list draws no random number, so recording does not change the run, which a test checks. `recordSprites: false` leaves them out.
 
-The log has a `version`, now 4. Version 3 logs had no funding, auto budget or effects in the state, version 2 logs also had no sprites, and version 1 logs also had tile numbers without the flags and no route tiles.
+The log has a `version`, now 5. Version 4 logs had no `caps` in the state, version 3 logs also had no funding, auto budget or effects in the state, version 2 logs also had no sprites, and version 1 logs also had tile numbers without the flags and no route tiles.
 
 `agents/passive.ts` has the passive agent, which does nothing.
 
@@ -361,6 +361,7 @@ The flooring only matters when a percentage has a fraction, like 0.052, or falls
 - `cityClass`: `evaluation.cityClass`
 - `approval`: `evaluation.cityYes`, from 0 to 100
 - `rci`: `_valves.resValve`, `comValve` and `indValve`
+- `caps`: `_valves.resCap`, `comCap` and `indCap`
 - `problems`: the seven problem values, see below
 - `poweredZoneCount` and `unpoweredZoneCount`: from `_census`
 - `taxRate`: `budget.cityTax`
@@ -369,6 +370,8 @@ The flooring only matters when a percentage has a fraction, like 0.052, or falls
 - `effects`: `budget.roadEffect`, `policeEffect` and `fireEffect`
 
 The engine keeps the funding as fractions from 0 to 1. `funding` gives whole percents, floored as the budget window shows them (`handleBudgetRequest` in `src/game.js`), so 0.29 reads 28. The effects are what the funding does: up to 32 for roads, and up to 1,000 for each police and fire station. `updateFundEffects` in `src/budget.js` sets them whenever the budget is paid or the funding changes. A road effect below 30 lets roads decay, and the police and fire effects set how much each station adds to its coverage.
+
+`caps` says, for each zone type, whether the engine holds its demand at 0 or below for want of a stadium, an airport or a seaport. `_sendMessages` in `src/simulation.js` sets each flag in the same branch that sends the message the browser shows, "Residents demand a Stadium", "Commerce requires an Airport" or "Industry requires a Sea Port": more than 500 residents in the census without a stadium, more than 100 commercial without an airport, more than 70 industrial without a seaport. `setValves` in `src/valves.js` then sets a positive demand to 0, and the score takes 15% off for each flag. The check runs once every 64 time units, about every 16 months, and the flag keeps its value until the next check, so a new stadium lifts the cap only at the next check. It tells an agent what the message tells a player.
 
 The engine computes its seven problem values only during the yearly evaluation and keeps them in a private array in `src/evaluation.js`. `getState` recomputes them from the current census with the same formulas. Crime, pollution, housing and taxes come straight from census and budget fields. Crime and traffic used to be 0 in every city, because of two porting bugs fixed in changes 5 and 6 of `CHANGES.md`. Unemployment and fire severity are copies of two private one line functions in `evaluation.js`. Traffic is the exception. It is the value from the last yearly evaluation of a city with population, and it is not saved. For an empty city, and after a load until the next such evaluation, it reads 0.
 
