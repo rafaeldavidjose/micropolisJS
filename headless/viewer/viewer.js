@@ -90,6 +90,11 @@ const PROBLEMS = [
   ['unemployment', 'Unemployment'],
   ['fire', 'Fire'],
 ];
+/**
+ * The agent report fields that are amounts of money.
+ * @type {string[]}
+ */
+const MONEY_FIELDS = ['reserve'];
 /** @type {number} */
 const MIN_ZOOM = 0.2;
 /** @type {number} */
@@ -1361,11 +1366,47 @@ function showState() {
        * @param {[string, unknown]} entry
        * @returns {[string, string, string]}
        */
-      ([name, value]) => [name,
-        typeof value === 'object' ? JSON.stringify(value) : String(value),
-        'report.' + name]) :
-    [['report', 'none', 'report']];
+      ([name, value]) => [name.charAt(0).toUpperCase() + name.slice(1),
+        formatReportValue(name, value), 'report.' + name]) :
+    [['Report', 'none', 'report']];
   byId('report').replaceChildren(...keyValues(report));
+}
+
+/**
+ * A field of an agent report as text: a list or a count per reason joined
+ * with commas, nothing as "none", and the money fields in dollars.
+ * @param {string} name
+ * @param {unknown} value
+ * @returns {string}
+ */
+function formatReportValue(name, value) {
+  if (value === null || value === undefined) {
+    return 'none';
+  }
+
+  if (Array.isArray(value)) {
+    return value.length === 0 ? 'none' : value.join(', ');
+  }
+
+  if (typeof value === 'number') {
+    return MONEY_FIELDS.includes(name) ? formatMoney(value) :
+      formatNumber(value);
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 'yes' : 'no';
+  }
+
+  if (typeof value === 'object') {
+    /** @type {[string, unknown][]} */
+    const entries = Object.entries(value);
+
+    return entries.length === 0 ? 'none' : entries.map(
+      /** @param {[string, unknown]} entry @returns {string} */
+      ([key, count]) => `${key} ${count}`).join(', ');
+  }
+
+  return String(value);
 }
 
 /**

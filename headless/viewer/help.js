@@ -171,9 +171,14 @@ const REPORT_HELP = {
       '$5 a bridge, $1 more under heavy traffic and $2 a rail tile, times ' +
       'the level, and $100 a police or fire station, plus 25%. Actions ' +
       'that cost money only use what is above it.',
-    waitingForMoney: 'True when a rule fitted but its action cost more ' +
-      'than the money above the reserve. The agent then waits: the rest ' +
-      'of the turn only sets the budget and the taxes.',
+    waiting: 'What the agent is saving up for: a rule fitted, but its ' +
+      'action cost more than the money above the reserve. It shows the ' +
+      'action, its price, the funds left and the money kept. The rest of ' +
+      'the turn the agent only fights fires and sets the budget and the ' +
+      'taxes. None means it did not wait.',
+    waitingForMoney: 'Older logs: yes when a rule fitted but its action ' +
+      'cost more than the money above the reserve. The agent then waits: ' +
+      'the rest of the turn only sets the budget and the taxes.',
   },
 
   // demo.ts

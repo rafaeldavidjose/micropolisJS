@@ -201,6 +201,7 @@ interface TurnPlan {
   done: Set<string>;
   roadTries: number;
   outOfMoney: boolean;
+  waiting: string | null;
   actions: GameAction[];
   rules: string[];
 }
@@ -482,6 +483,42 @@ function placedFor(view: CityView, plan: TurnPlan, tool: string,
   return clash ? null : site;
 }
 
+const BUILDING_NAMES: Record<string, string> = {
+  residential: 'residential zone',
+  commercial: 'commercial zone',
+  industrial: 'industrial zone',
+  coal: 'coal plant',
+  nuclear: 'nuclear plant',
+  police: 'police station',
+  fire: 'fire station',
+  port: 'seaport',
+};
+
+const ROUTE_NAMES: Record<string, string> = {
+  road: 'road',
+  rail: 'rail',
+  wire: 'power line',
+};
+
+function formatMoney(amount: number): string {
+  return '$' + amount.toLocaleString('en-US');
+}
+
+// What the agent waits for, as its report shows it
+function waitingFor(action: GameAction, cost: number, funds: number,
+    keep: number): string {
+  let name: string = 'bulldozing';
+
+  if (action.type === 'build') {
+    name = BUILDING_NAMES[action.tool] ?? action.tool;
+  } else if (action.type === 'route') {
+    name = ROUTE_NAMES[action.tool] ?? action.tool;
+  }
+
+  return `${name}, ${formatMoney(cost)}, funds ${formatMoney(funds)}, ` +
+    `reserve ${formatMoney(keep)}`;
+}
+
 /* The quote of an action the turn can still pay for, keeping the reserve,
  * or null. When the money is short the agent waits for it: the turn plays
  * no more actions that cost money. */
@@ -496,6 +533,7 @@ function payable(view: CityView, plan: TurnPlan, action: GameAction,
 
   if (quote.success || quote.reason === 'insufficient-funds') {
     plan.outOfMoney = true;
+    plan.waiting ??= waitingFor(action, quote.cost, plan.funds, keep);
   }
 
   return null;
@@ -1012,6 +1050,7 @@ function liftDemandCap(view: CityView, plan: TurnPlan,
     // Saving for these held up all growth for years, so the rule never waits
     if (plan.outOfMoney) {
       plan.outOfMoney = false;
+      plan.waiting = null;
       return null;
     }
 
@@ -1521,6 +1560,7 @@ function createRulesAgent(): Agent {
         done: new Set(),
         roadTries: 0,
         outOfMoney: false,
+        waiting: null,
         actions: [],
         rules: [],
       };
@@ -1592,8 +1632,8 @@ function createRulesAgent(): Agent {
 
       report = {
         rules: plan.rules,
+        waiting: plan.waiting,
         reserve: reserve,
-        waitingForMoney: plan.outOfMoney,
       };
       return plan.actions;
     },
