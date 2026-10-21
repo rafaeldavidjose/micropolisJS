@@ -1,130 +1,194 @@
 /* The explanations the viewer shows for each metric, on hover, keyboard
  * focus or tap. All of them are here, so they are easy to correct. Each
- * fact comes from src/ or from headless/README.md, and the comments say
- * where to check it. */
+ * says what the value means for the city, what a good and a bad value look
+ * like, and the most common reason it is stuck, one line each. The facts
+ * come from src/ or from headless/README.md, and the comments say where to
+ * check them. */
 
 /** @type {Record<string, string>} */
 const HELP = {
-  date: 'The in-game month at the start of this turn, which is the moment ' +
-    'the agent saw. The last position is the end of the game.',
+  date: 'The month the agent saw at the start of this turn. The last ' +
+    'position is the end of the game, after the last turn ran.',
 
   // budget.js: setFunds clamps at 0, collectTax only with population
-  funds: 'Money in the city account, never below $0. Building and ' +
-    'bulldozing take from it at once, and in January the yearly budget ' +
-    'adds the taxes and pays for roads, fire and police. That budget only ' +
-    'runs for a city with population.',
+  funds: 'The money the city has to build with. Building takes from it ' +
+    'at once, and each January the taxes come in and roads, fire and ' +
+    'police are paid.\n' +
+    'Good: money left after January to keep building. Bad: close to $0, ' +
+    'when nothing can be built.\n' +
+    'Stuck low: the taxes barely cover the yearly upkeep, so only a small ' +
+    'surplus comes in each January. An empty city pays no taxes.',
 
   // evaluation.js getPopulation, called monthly by _checkGrowth
-  population: 'People in the city, from the census: (residential + 8 × ' +
-    '(commercial + industrial)) × 20. It is recomputed every month.',
+  population: 'How many people live in the city, counted every month: ' +
+    'homes count once and jobs in shops and industry eight times, all ' +
+    'times 20.\n' +
+    'Good: rising. Bad: falling, which also halves the score when it ' +
+    'happens in the month before January.\n' +
+    'Stuck: residential demand held at 0, often for want of a stadium, ' +
+    'zones without power or a road, or no money to build.',
 
   // evaluation.js getScore and doVotes, and the porting bugs in CHANGES.md
-  score: 'The city score of micropolisJS, 0 to 1,000, higher is better. ' +
-    'It changes once a year, in January, and only moves half way to the ' +
-    'new value. Any drop in population in the month before January halves ' +
-    'it, and police and fire funding do not change it (porting bugs).',
-  cityClass: 'Village up to 2,000 people, then town, city above 10,000, ' +
-    'capital above 50,000, metropolis above 100,000 and megalopolis above ' +
-    '500,000. It follows the population every month.',
-  approval: 'The share of 100 voters who approve, 0 to 100%. A voter ' +
-    'approves when the score beats a random number up to 1,000, so it is ' +
-    'about the score divided by 10 plus noise. It changes once a year, in ' +
-    'January, and is 50% while the city has no population.',
+  score: 'The micropolisJS city score, 0 to 1,000. It changes once a ' +
+    'year, in January, half way to the new value, and the problems, the ' +
+    'tax, zones without power and capped demand pull it down.\n' +
+    'Good: above 500 and rising. Bad: a sudden drop to about half, which ' +
+    'any fall in population in the month before January causes (a ' +
+    'porting bug).\n' +
+    'Stuck: an empty city is not evaluated and stays at 500. Police and ' +
+    'fire funding never change it (a porting bug).',
+  cityClass: 'The size of the city by its population: village up to ' +
+    '2,000 people, then town, city above 10,000, capital above 50,000, ' +
+    'metropolis above 100,000 and megalopolis above 500,000. It follows ' +
+    'the population every month.',
+  approval: 'How many of 100 voters approve of the mayor. It is about the ' +
+    'score divided by 10, plus chance, and changes once a year, in ' +
+    'January.\n' +
+    'Good: above 50%. Bad: low, which follows a low score.\n' +
+    'Stuck: an empty city stays at 50%.',
 
   // budget.js cityTax, valves.js taxTable
-  taxRate: 'The city tax, 0 to 20%, 7% in a new city. The taxes come in ' +
-    'once a year, in January. A higher rate lowers the demand for all ' +
-    'three zone types.',
+  taxRate: 'The city tax, 0 to 20%, 7% in a new city. A higher rate brings ' +
+    'more money each January and less demand for homes, shops and ' +
+    'industry, and the same rate costs more demand on a harder level.\n' +
+    'Good: low enough that the city still wants to grow, high enough to ' +
+    'pay its upkeep. Bad: high, when demand falls below 0.\n' +
+    'It changes only when a player or an agent sets it.',
 
   /* The budget fields. budget.js: collectTax sets the full costs every
    * January, _calculateBestPercentages lowers the shares, doBudgetNow
    * turns auto budget off, updateFundEffects sets the effects. */
-  autoBudget: 'Whether the yearly budget pays by itself. With it on, ' +
-    'January pays roads, fire and police when some money is left after ' +
-    'paying. Otherwise the engine turns it off and opens the budget ' +
-    'window, and while it is off the window opens every January. Only a ' +
-    'player or an agent turns it back on.',
-  roadFunding: 'The share of full road and rail maintenance the city ' +
-    'pays, 0 to 100%, floored as the budget window shows it. Full ' +
-    'maintenance is $1 a road tile, $5 a bridge, $1 more for heavy ' +
-    'traffic and $2 a rail tile, times 0.7, 0.9 or 1.2 by level. After a ' +
-    'year without enough money the engine lowers it to what the city ' +
-    'could pay, and it stays there until someone raises it.',
-  fireFunding: 'The share of full fire station maintenance the city pays, ' +
-    '$100 a station a year, 0 to 100%. The engine lowers it like the road ' +
-    'share, and pays roads first, then fire, then police.',
-  policeFunding: 'The share of full police station maintenance the city ' +
-    'pays, $100 a station a year, 0 to 100%. The engine lowers it like ' +
-    'the road share, and police are paid last.',
-  roadEffect: 'How well roads are kept, 0 to 32: 32 × paid / full ' +
-    'maintenance, set when the budget is paid or the shares change. ' +
-    'Below 30, about 94% funding, road and rail tiles start to turn into ' +
-    'rubble and bridges into water. The score loses 32 minus this. A city ' +
-    'without population keeps 32.',
+  autoBudget: 'Whether January pays the yearly budget by itself.\n' +
+    'Good: on, so roads, fire and police are paid without a question. ' +
+    'Bad: off, when the budget window opens every January.\n' +
+    'Stuck off: the engine turns it off the first time the money runs ' +
+    'out and never turns it back on. Only a player or an agent does.',
+  roadFunding: 'The share of the full road and rail upkeep the city pays ' +
+    'each January. The full upkeep is $1 a road tile, $5 a bridge and $2 ' +
+    'a rail tile, more on harder levels.\n' +
+    'Good: 100%. Bad: below about 94%, when roads and rails slowly turn ' +
+    'into rubble and bridges fall into the water.\n' +
+    'Stuck low: after a January without enough money the engine lowers it ' +
+    'to what the city could pay, and it stays there until someone raises ' +
+    'it.',
+  fireFunding: 'The share of the full fire station upkeep the city pays, ' +
+    '$100 a station a year.\n' +
+    'Good: 100%, so fire stations put fires out fast. Bad: low, which ' +
+    'weakens every station.\n' +
+    'Stuck low: after a short budget the engine lowers it, after roads, ' +
+    'and it stays there until someone raises it.',
+  policeFunding: 'The share of the full police station upkeep the city ' +
+    'pays, $100 a station a year.\n' +
+    'Good: 100%, so police stations hold crime down. Bad: low, which ' +
+    'weakens every station.\n' +
+    'Stuck low: after a short budget the engine lowers it, police last, ' +
+    'and it stays there until someone raises it.',
+  roadEffect: 'How well the roads are kept, 0 to 32, from the road ' +
+    'funding.\n' +
+    'Good: 30 or more. Bad: below 30, when road and rail tiles turn into ' +
+    'rubble and bridges into water, and the score loses up to 32 ' +
+    'points.\n' +
+    'Stuck low: the road funding stays low after a short budget. An ' +
+    'empty city keeps 32.',
   // emergencyServices.js, crimeScan and fireAnalysis in blockMapUtils.js
-  policeEffect: 'The strength of each police station, 0 to 1,000: 1,000 × ' +
-    'paid / full police maintenance. A station adds it to its block of 8 ' +
-    'by 8 tiles, halved without power and halved again without a road ' +
-    'next to it. Smoothed over the blocks around, it is taken off the ' +
-    'crime there.',
+  policeEffect: 'How strong each police station is, 0 to 1,000, from the ' +
+    'police funding.\n' +
+    'Good: 1,000. Bad: low, so the stations lower crime less. A station ' +
+    'without power works at half strength, and without a road next to it ' +
+    'at half of that.\n' +
+    'Stuck low: the police funding stays low after a short budget.',
   // miscTiles.js fireFound
-  fireEffect: 'The strength of each fire station, 0 to 1,000, worked out ' +
-    'like the police effect. Where the smoothed value is above 100, a ' +
-    'fire goes out with a chance of 1 in 2 on the one scan in four that ' +
-    'checks it, against 1 in 11 with no station near.',
+  fireEffect: 'How strong each fire station is, 0 to 1,000, from the fire ' +
+    'funding.\n' +
+    'Good: 1,000. Near a strong station a fire goes out with a chance of ' +
+    '1 in 2 each time it is checked, against 1 in 11 with no station ' +
+    'near. Bad: low.\n' +
+    'Stuck low: the fire funding stays low after a short budget.',
   budgetMissing: 'Logs written before version 4 have no funding shares, ' +
     'auto budget or effects in the state.',
 
   // mapScanner.js counts them, evaluation.js getScore uses the share
-  poweredZones: 'Zones and buildings with power, out of all of them, ' +
-    'counted on every pass of the map scan. The score is multiplied by ' +
-    'the share with power.',
+  poweredZones: 'Zones and buildings with power, out of all of them.\n' +
+    'Good: all of them. Bad: many without, since a zone without power ' +
+    'does not grow, and the score is multiplied by the share with ' +
+    'power.\n' +
+    'Stuck: the zones are not joined to a power line, or the plants are ' +
+    'overloaded. A coal plant powers only about 450 to 560 tiles in a ' +
+    'real city.',
 
-  // valves.js clamps the valves, simulation.js sets them and the caps
-  residential: 'Demand for homes, from -2,000 to 2,000. Above 0 the city ' +
-    'wants more. It changes twice a month. Without a stadium it stays at ' +
-    '0 or below once the census counts more than 500 residents, about ' +
-    '10,000 people.',
-  commercial: 'Demand for shops and offices, from -1,500 to 1,500. Above ' +
-    '0 the city wants more. It changes twice a month. Without an airport ' +
-    'it stays at 0 or below once commercial population passes 100, about ' +
-    '16,000 people.',
-  industrial: 'Demand for industry, from -1,500 to 1,500. Above 0 the ' +
-    'city wants more. It changes twice a month. Without a seaport it ' +
-    'stays at 0 or below once industrial population passes 70, about ' +
-    '11,200 people.',
+  /* valves.js clamps the valves and holds them at 0 while a cap is on,
+   * simulation.js _sendMessages sets the caps with their messages */
+  residential: 'How much the city wants new homes, from -2,000 to 2,000. ' +
+    'Above 0 new homes fill up, below 0 homes empty. It changes twice a ' +
+    'month.\n' +
+    'Good: above 0 while there are homes to fill. Bad: far below 0.\n' +
+    'Stuck at 0: more than 500 residents in the census, about 10,000 ' +
+    'people, and no stadium. The engine holds it at 0 until one is ' +
+    'built, and checks about every 16 months. A high tax pulls it down ' +
+    'too.',
+  commercial: 'How much the city wants new shops and offices, from -1,500 ' +
+    'to 1,500. Above 0 new ones fill up, below 0 they empty. It changes ' +
+    'twice a month.\n' +
+    'Good: above 0. Bad: far below 0.\n' +
+    'Stuck at 0: more than 100 commercial in the census, about 16,000 ' +
+    'people, and no airport. The engine holds it at 0 until one is built.',
+  industrial: 'How much the city wants new industry, from -1,500 to ' +
+    '1,500. Above 0 new industry fills up, below 0 it empties. It changes ' +
+    'twice a month.\n' +
+    'Good: above 0. Bad: far below 0.\n' +
+    'Stuck at 0: more than 70 industrial in the census, about 11,200 ' +
+    'people, and no seaport. The engine holds it at 0 until one is built.',
 
   /* The problems, higher is worse for all seven. runner.ts getState
    * recomputes them from the census, so they move during the year, while
    * the score and the vote use the value of the January evaluation.
    * Formulas from evaluation.js and blockMapUtils.js. */
-  crime: 'Average crime over the land with value, 0 to 250, higher is ' +
-    'worse. Low land value and dense population raise it, and a police ' +
-    'station nearby lowers it. It moves during the year. Logs from before ' +
-    'the crime fix show 0.',
-  pollution: 'Average pollution over the polluted land, 0 to 255, higher ' +
-    'is worse. Industry, coal plants, the seaport and airport, busy ' +
-    'roads, fire and radiation raise it. It moves during the year.',
-  housing: 'The land value average times 7/10, 0 to 175. Expensive land ' +
-    'counts as a problem here, so higher is worse. It moves during the ' +
-    'year.',
-  taxes: 'Ten times the tax rate, 0 to 200, higher is worse.',
-  traffic: 'Average traffic density over the land with value, times 2.4, ' +
-    'from 0 to about 570, higher is worse. It comes from the last January ' +
-    'evaluation. Logs from before the traffic fix show 0.',
-  unemployment: 'Residents for each job: (residential / (8 × jobs) - 1) ' +
-    '× 255, at most 255, higher is worse. It is negative, down to -255, ' +
-    'when there are more jobs than residents, and the bar is then empty. ' +
-    'It moves during the year.',
-  fire: 'Five times the number of burning tiles, at most 255, higher is ' +
-    'worse. It moves during the year.',
+  crime: 'How much crime there is where the land has value, 0 to 250. It ' +
+    'moves during the year.\n' +
+    'Good: low, under about 50. Bad: high. Above 190 it takes value off ' +
+    'the land.\n' +
+    'Stuck high: poor, crowded land with no police station near, or the ' +
+    'police funding cut. Logs from before the crime fix show 0.',
+  pollution: 'How polluted the polluted land is, 0 to 255. It moves during ' +
+    'the year.\n' +
+    'Good: low. Bad: above 60, when a monster can come, and high ' +
+    'pollution lowers the land value.\n' +
+    'Stuck high: industry, coal plants, the seaport, the airport and busy ' +
+    'roads. One coal plant can push a small town above 60.',
+  housing: 'The land value average times 7/10, 0 to 175. The score counts ' +
+    'expensive land as a problem, though valuable land also brings more ' +
+    'taxes.\n' +
+    'For the score lower is better. It moves during the year, and ' +
+    'pollution and crime pull it down.',
+  taxes: 'Ten times the tax rate, 0 to 200. For the score lower is ' +
+    'better.\n' +
+    'It moves only with the tax rate.',
+  traffic: 'How busy the roads are where the land has value, times 2.4, ' +
+    'from 0 to about 570.\n' +
+    'Good: low. Bad: high, which adds pollution and doubles the upkeep of ' +
+    'the busiest road tiles.\n' +
+    'Stuck: it only changes at the January evaluation, so this is last ' +
+    'January\'s value. Logs from before the traffic fix show 0.',
+  unemployment: 'How many residents there are for each job, from -255 to ' +
+    '255.\n' +
+    'Good: 0 or below, a job for everyone. Bad: high, more residents than ' +
+    'jobs. Below 0 there are more jobs than residents and the bar is ' +
+    'empty.\n' +
+    'Stuck high: too few shops and industry for the homes, often because ' +
+    'their demand is capped or their zones have no power.',
+  fire: 'Five times the number of burning tiles, at most 255.\n' +
+    'Good: 0. Bad: above 0, something is burning.\n' +
+    'Stuck: a fire with no fire station near spreads through trees and ' +
+    'zones and can burn for years. A firebreak or a station stops it.',
 
   // budget.js doBudgetNow and the budget log of headless/budget.ts
   budgetWindows: 'Budget windows answered while the city ran this turn: ' +
     'the funds before the budget, the taxes collected, and the share of ' +
-    'full funding paid for roads, fire and police. One opens when the ' +
-    'money runs out, and every January once auto budget is off. The paid ' +
-    'shares stay until someone raises them.',
+    'full upkeep paid for roads, fire and police.\n' +
+    'Good: 100% for all three. Bad: less, and those shares stay until ' +
+    'someone raises them.\n' +
+    'One opens when the money runs out in January, and every January ' +
+    'once auto budget is off.',
 
   report: 'What the agent reported about this turn. Each agent reports ' +
     'its own fields, and the passive agent none.',
@@ -132,7 +196,8 @@ const HELP = {
   // drawTracks and drawSeries in viewer.js
   actionsTrack: 'The actions of every turn. A bar is the share of the ' +
     'action limit played, its red part the share that failed, and a blue ' +
-    'mark a turn in which a budget window opened.',
+    'mark a turn in which a budget window opened. Long gaps are turns in ' +
+    'which the agent played nothing.',
   populationTrack: 'The population at the start of every turn, scaled to ' +
     'the highest value of the game. The dot is the current turn.',
   fundsTrack: 'The funds at the start of every turn, scaled to the highest ' +
@@ -152,7 +217,7 @@ const REPORT_HELP = {
     draws: 'Actions it drew and quoted this turn, the rejected ones ' +
       'included.',
     rejected: 'Draws it dropped because the quote failed or the money ' +
-      'left was not enough.',
+      'left was not enough. Once the money is gone, most draws are.',
     reasons: 'Why the rejected draws failed, with a count for each reason.',
     gaveUp: 'Slots left empty after too many rejected draws, 20 by default.',
   },
@@ -160,25 +225,28 @@ const REPORT_HELP = {
   // rules.ts
   rules: {
     rules: 'The rule behind each action of this turn, in order. Fire: ' +
-      'firebreak, emergency-station. Power: ' +
-      'first-plant, connect-zone, extra-plant. Budget: funding, ' +
-      'auto-budget. Maintenance: repair-road. Then stadium, airport or ' +
-      'port for a capped demand, police, fire-station, raise-tax or ' +
-      'lower-tax, rezone, demolish-empty and demolish-polluter, and for ' +
-      'growth zone and road.',
-    reserve: 'The money the agent kept this turn for the next yearly ' +
-      'budget: its full cost by the formula of the engine, $1 a road tile, ' +
-      '$5 a bridge, $1 more under heavy traffic and $2 a rail tile, times ' +
-      'the level, and $100 a police or fire station, plus 25%. Actions ' +
-      'that cost money only use what is above it.',
+      'firebreak, emergency-station. Power: first-plant, connect-zone, ' +
+      'extra-plant. Budget: funding, auto-budget. Maintenance: ' +
+      'repair-road. Then stadium, airport or port for a capped demand, ' +
+      'police, fire-station, raise-tax or lower-tax, rezone, ' +
+      'demolish-empty and demolish-polluter, and for growth zone and ' +
+      'road.\n' +
+      'None: the agent played nothing, most often because it waited for ' +
+      'money.',
     waiting: 'What the agent is saving up for: a rule fitted, but its ' +
-      'action cost more than the money above the reserve. It shows the ' +
+      'action costs more than the money above the reserve. It shows the ' +
       'action, its price, the funds left and the money kept. The rest of ' +
       'the turn the agent only fights fires and sets the budget and the ' +
-      'taxes. None means it did not wait.',
-    waitingForMoney: 'Older logs: yes when a rule fitted but its action ' +
-      'cost more than the money above the reserve. The agent then waits: ' +
-      'the rest of the turn only sets the budget and the taxes.',
+      'taxes.\n' +
+      'None: it did not wait.\n' +
+      'Often: the funds sit just under the reserve, so even a $100 zone ' +
+      'waits for the January surplus.',
+    reserve: 'The money the agent keeps for the next January: the full ' +
+      'yearly upkeep of its roads, rails and stations by the engine\'s ' +
+      'formula, plus 25%. It only spends what is above it, except to ' +
+      'fight a fire.',
+    waitingForMoney: 'Older logs: yes when the agent waited for money ' +
+      'this turn, which newer logs say in "waiting".',
   },
 
   // demo.ts

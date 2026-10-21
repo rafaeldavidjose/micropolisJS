@@ -573,6 +573,15 @@ details[open] > summary::before {
   bottom: 0;
 }
 
+/* Why the engine holds the value above, on a line of its own */
+.inspector .reason {
+  grid-column: 1 / -1;
+  color: var(--pick);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  text-align: right;
+}
+
 .bar.centred::after {
   content: "";
   position: absolute;
@@ -721,6 +730,7 @@ details[open] > summary::before {
   color: var(--fg);
   font-size: var(--text-sm);
   line-height: 1.45;
+  white-space: pre-line;
   pointer-events: none;
 }
 

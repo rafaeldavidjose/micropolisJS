@@ -41,6 +41,17 @@ import { HELP, REPORT_HELP } from './help.js';
  * @property {HTMLCanvasElement | null} image
  * @property {number[]} population
  * @property {number[]} funds
+ * @property {LoweredFunding[]} lowered
+ */
+
+/**
+ * For each funding share at one position of the log, the date of the
+ * budget window that lowered it, or null when no window did or a budget
+ * action set the share again since.
+ * @typedef {object} LoweredFunding
+ * @property {CityDate | null} road
+ * @property {CityDate | null} fire
+ * @property {CityDate | null} police
  */
 
 /**
@@ -95,6 +106,17 @@ const PROBLEMS = [
  * @type {string[]}
  */
 const MONEY_FIELDS = ['reserve'];
+/** @type {('road' | 'fire' | 'police')[]} */
+const SERVICES = ['road', 'fire', 'police'];
+/**
+ * The building whose lack makes the engine cap each demand.
+ * @type {Record<'residential' | 'commercial' | 'industrial', string>}
+ */
+const CAP_BUILDINGS = {
+  residential: 'stadium',
+  commercial: 'airport',
+  industrial: 'seaport',
+};
 /** @type {number} */
 const MIN_ZOOM = 0.2;
 /** @type {number} */
@@ -363,6 +385,60 @@ function turnAt(index) {
 }
 
 /**
+ * Follows the funding shares through the log. A budget action sets them,
+ * and a budget window lowers one when it pays less than the share set, as
+ * the window would show that share. An agent can set a low share itself,
+ * so only a window counts as lowering. Logs before version 4 have no
+ * shares in the state.
+ * @param {RunLog} log
+ * @returns {LoweredFunding[]}
+ */
+function findLoweredFunding(log) {
+  /** @type {CityState} */
+  const first = log.turns.length > 0 ? log.turns[0].state : log.final.state;
+  /** @type {LoweredFunding} */
+  const current = { road: null, fire: null, police: null };
+  /** @type {LoweredFunding[]} */
+  const lowered = [];
+
+  if (first.funding === undefined) {
+    return Array.from({ length: log.turns.length + 1 }, () => current);
+  }
+
+  /** @type {Record<string, number>} */
+  const shares = { ...first.funding };
+
+  for (const turn of log.turns) {
+    lowered.push({ ...current });
+
+    for (const applied of turn.actions) {
+      /** @type {GameAction} */
+      const action = /** @type {GameAction} */ (applied.action);
+
+      if (applied.result.success && action.type === 'setBudgetPercentages') {
+        for (const service of SERVICES) {
+          shares[service] = action[service];
+          current[service] = null;
+        }
+      }
+    }
+
+    for (const record of turn.budgetWindows) {
+      for (const service of SERVICES) {
+        if (record[service] < Math.floor(shares[service] / 100 * 100)) {
+          current[service] = record.date;
+        }
+
+        shares[service] = record[service];
+      }
+    }
+  }
+
+  lowered.push({ ...current });
+  return lowered;
+}
+
+/**
  * @param {TurnLog} turn
  * @returns {number}
  */
@@ -408,6 +484,7 @@ async function start(log, name) {
     image: null,
     population: [],
     funds: [],
+    lowered: findLoweredFunding(log),
   };
 
   for (let index = 0; index < run.count; index++) {
@@ -1098,16 +1175,18 @@ function showActions() {
 }
 
 /**
- * A bar from the left, or from the middle for values that can be negative.
+ * A bar from the left, or from the middle for values that can be negative,
+ * with a line under it when the engine holds the value for a reason.
  * @param {string} name
  * @param {number} value
  * @param {number} max
  * @param {string} color
  * @param {boolean} centred
  * @param {string} help
+ * @param {string} [reason]
  * @returns {HTMLElement[]}
  */
-function bar(name, value, max, color, centred, help) {
+function bar(name, value, max, color, centred, help, reason = '') {
   /** @type {HTMLElement} */
   const track = element('div', '', 'bar' + (centred ? ' centred' : ''));
   /** @type {HTMLElement} */
@@ -1125,19 +1204,32 @@ function bar(name, value, max, color, centred, help) {
 
   fill.style.background = color;
   track.append(fill);
-  return [withHelp(element('span', name), help), track,
+
+  /** @type {HTMLElement[]} */
+  const cells = [withHelp(element('span', name), help), track,
     element('span', formatNumber(value), 'value')];
+
+  return reason === '' ? cells : [...cells, element('span', reason, 'reason')];
 }
 
 /**
- * @param {[string, string, string][]} rows name, value and help key
+ * @param {[string, string, string, string?][]} rows name, value, help key
+ *   and the reason the engine holds the value, if it does
  * @returns {HTMLElement[]}
  */
 function keyValues(rows) {
   return rows.flatMap(
-    /** @param {[string, string, string]} row @returns {HTMLElement[]} */
-    ([name, value, help]) =>
-      [withHelp(element('dt', name), help), element('dd', value)]);
+    /**
+     * @param {[string, string, string, string?]} row
+     * @returns {HTMLElement[]}
+     */
+    ([name, value, help, reason]) => {
+      /** @type {HTMLElement[]} */
+      const cells = [withHelp(element('dt', name), help),
+        element('dd', value)];
+
+      return reason ? [...cells, element('dd', reason, 'reason')] : cells;
+    });
 }
 
 /**
@@ -1279,12 +1371,27 @@ function showBudget(state) {
     return;
   }
 
+  /** @type {LoweredFunding} */
+  const lowered = run.lowered[position];
+  /**
+   * @param {'road' | 'fire' | 'police'} service
+   * @returns {string}
+   */
+  const loweredBy = (service) => lowered[service] === null ? '' :
+    `lowered by the engine after a short budget in ` +
+    formatDate(lowered[service]);
+
   byId('budget').replaceChildren(...keyValues([
     ['Auto budget', state.autoBudget ? 'On' : 'Off', 'autoBudget'],
-    ['Road funding', state.funding.road + '%', 'roadFunding'],
-    ['Fire funding', state.funding.fire + '%', 'fireFunding'],
-    ['Police funding', state.funding.police + '%', 'policeFunding'],
-    ['Road effect', `${state.effects.road} of 32`, 'roadEffect'],
+    ['Road funding', state.funding.road + '%', 'roadFunding',
+      loweredBy('road')],
+    ['Fire funding', state.funding.fire + '%', 'fireFunding',
+      loweredBy('fire')],
+    ['Police funding', state.funding.police + '%', 'policeFunding',
+      loweredBy('police')],
+    ['Road effect', `${state.effects.road} of 32`, 'roadEffect',
+      state.effects.road < 30 && state.population > 0 ?
+        'below 30: roads decay' : ''],
     ['Police effect', `${formatNumber(state.effects.police)} of 1,000`,
       'policeEffect'],
     ['Fire effect', `${formatNumber(state.effects.fire)} of 1,000`,
@@ -1302,16 +1409,25 @@ function showState() {
   const turn = turnAt(position);
   /** @type {number} */
   const zones = state.poweredZoneCount + state.unpoweredZoneCount;
+  /** @type {string} */
+  const empty = state.population === 0 ? 'no people: does not change' : '';
+  /**
+   * Logs before version 5 have no caps.
+   * @param {'residential' | 'commercial' | 'industrial'} kind
+   * @returns {string}
+   */
+  const capped = (kind) => state.caps?.[kind] && state.rci[kind] === 0 ?
+    'capped: no ' + CAP_BUILDINGS[kind] : '';
 
   byId('date').textContent = formatDate(state.date) +
     (position < run.log.turns.length ? ' · start of turn' : ' · end');
   byId('state').replaceChildren(...keyValues([
     ['Funds', formatMoney(state.funds), 'funds'],
     ['Population', formatNumber(state.population), 'population'],
-    ['Score', formatNumber(state.score), 'score'],
+    ['Score', formatNumber(state.score), 'score', empty],
     ['City class', state.cityClass.charAt(0) +
       state.cityClass.slice(1).toLowerCase(), 'cityClass'],
-    ['Approval', state.approval + '%', 'approval'],
+    ['Approval', state.approval + '%', 'approval', empty],
     ['Tax rate', state.taxRate + '%', 'taxRate'],
     ['Powered zones', `${state.poweredZoneCount} of ${zones}`,
       'poweredZones'],
@@ -1321,11 +1437,11 @@ function showState() {
   // The valves run from -2000 to 2000 for residential, 1500 for the others
   byId('rci').replaceChildren(
     ...bar('Residential', state.rci.residential, 2000, 'var(--res)', true,
-      'residential'),
+      'residential', capped('residential')),
     ...bar('Commercial', state.rci.commercial, 1500, 'var(--com)', true,
-      'commercial'),
+      'commercial', capped('commercial')),
     ...bar('Industrial', state.rci.industrial, 1500, 'var(--ind)', true,
-      'industrial'));
+      'industrial', capped('industrial')));
   byId('problems').replaceChildren(...PROBLEMS.flatMap(
     /**
      * @param {[keyof CityState['problems'], string]} problem
@@ -1366,10 +1482,23 @@ function showState() {
        * @param {[string, unknown]} entry
        * @returns {[string, string, string]}
        */
-      ([name, value]) => [name.charAt(0).toUpperCase() + name.slice(1),
+      ([name, value]) => [reportLabel(name),
         formatReportValue(name, value), 'report.' + name]) :
     [['Report', 'none', 'report']];
   byId('report').replaceChildren(...keyValues(report));
+}
+
+/**
+ * The name of a report field in words, waitingForMoney as "Waiting for
+ * money".
+ * @param {string} name
+ * @returns {string}
+ */
+function reportLabel(name) {
+  /** @type {string} */
+  const words = name.replace(/[A-Z]/g, (letter) => ' ' + letter.toLowerCase());
+
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /**
