@@ -45,11 +45,15 @@ const { values, positionals }: ReplayArguments = parseArgs({
   },
 });
 
+/* explorer.exe opens a folder instead of a URL with a query string, so on
+ * Windows rundll32 hands the URL to the default browser as it is. No shell
+ * runs in between, so the & in the query is safe. */
 function openBrowser(url: string): void {
-  const command: string = process.platform === 'win32' ? 'explorer.exe' :
-    process.platform === 'darwin' ? 'open' : 'xdg-open';
+  const [command, args]: [string, string[]] = process.platform === 'win32' ?
+    ['rundll32', ['url.dll,FileProtocolHandler', url]] :
+    [process.platform === 'darwin' ? 'open' : 'xdg-open', [url]];
 
-  spawn(command, [url], { detached: true, stdio: 'ignore' }).unref();
+  spawn(command, args, { detached: true, stdio: 'ignore' }).unref();
 }
 
 const logPath: string | undefined = positionals[0];
