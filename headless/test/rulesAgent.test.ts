@@ -388,3 +388,27 @@ test('rules agent: it cuts a firebreak around a forest fire',
   assert.ok(withAgent.burnt * 5 < without.burnt,
     `${withAgent.burnt} against ${without.burnt}`);
 });
+
+/* On easy tuning seed 1003 the census passes 500 residents in the 1910s and
+ * the engine holds residential demand at 0. The agent saves for a stadium
+ * while it does, holds the tax at the base, and builds it in 1918. */
+test('rules agent: it saves for a stadium while the cap holds',
+  async (): Promise<void> => {
+  const log: RunLog = await runGame(createRulesAgent(), { seed: 1003 });
+  const built: number = log.turns.findIndex((turn: TurnLog): boolean =>
+    turn.actions.some((applied: AppliedAction): boolean =>
+      applied.result.success && applied.action.type === 'build' &&
+      applied.action.tool === 'stadium'));
+  const saving: TurnLog[] = log.turns.slice(0, built).filter(
+    (turn: TurnLog): boolean =>
+      String(turn.agent?.waiting ?? '').startsWith('stadium'));
+
+  assert.ok(built > 0);
+  assert.ok(saving.length > 0);
+
+  for (const turn of saving) {
+    assert.ok(turn.state.caps.residential);
+    assert.equal(turn.state.rci.residential, 0);
+    assert.ok(!rulesOf(turn).includes('lower-tax'));
+  }
+});

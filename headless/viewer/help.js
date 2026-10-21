@@ -162,8 +162,8 @@ const REPORT_HELP = {
     rules: 'The rule behind each action of this turn, in order. Fire: ' +
       'firebreak, emergency-station. Power: ' +
       'first-plant, connect-zone, extra-plant. Budget: funding, ' +
-      'auto-budget. Maintenance: repair-road. Then police, fire-station, ' +
-      'stadium, airport or port for a capped demand, raise-tax or ' +
+      'auto-budget. Maintenance: repair-road. Then stadium, airport or ' +
+      'port for a capped demand, police, fire-station, raise-tax or ' +
       'lower-tax, rezone, demolish-empty and demolish-polluter, and for ' +
       'growth zone and road.',
     reserve: 'The money the agent kept this turn for the next yearly ' +

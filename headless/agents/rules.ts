@@ -155,11 +155,12 @@ const POLLUTER_TOOLS: readonly string[] = [
   'airport',
 ];
 
-// The funds and the reserve at the start of a turn
+// The funds and the reserve at the start of a turn, and whether it waited
 interface FundsRecord {
   month: number;
   funds: number;
   reserve: number;
+  waited: boolean;
 }
 
 /* What the agent keeps from turn to turn: the road tiles it has seen, when
@@ -922,7 +923,7 @@ function stationsOf(view: CityView, tile: number): Position[] {
   return view.zones.filter((zone: ZoneView): boolean => zone.tile === tile);
 }
 
-/* Rule 4: with crime above the threshold, a police station next to a road
+/* Rule 5: with crime above the threshold, a police station next to a road
  * near the developed block with the most crime that no station covers. It
  * tries the CRIME_BLOCKS_TRIED worst blocks, the one higher up and then
  * further left first on a tie, and only sites that would cover the block. */
@@ -960,7 +961,7 @@ function buildPolice(view: CityView, plan: TurnPlan): Choice | null {
   return null;
 }
 
-/* Rule 5: a fire station next to a road where it covers the most developed
+/* Rule 6: a fire station next to a road where it covers the most developed
  * blocks that no station covers, if that is at least FIRE_MIN_BLOCKS. Ties
  * go to the site closer to the city centre. */
 function buildFireStation(view: CityView, plan: TurnPlan): Choice | null {
@@ -1007,11 +1008,10 @@ function buildFireStation(view: CityView, plan: TurnPlan): Choice | null {
   return null;
 }
 
-/* Rule 6: the building that lifts a demand cap, when the census passes the
+/* Rule 4: the building that lifts a demand cap, when the census passes the
  * engine's threshold and the city has none: a stadium for residential, an
  * airport for commercial, a seaport for industrial, in that order. It goes
- * on the site next to a road closest to the city centre, and only when the
- * money is there. */
+ * on the site next to a road closest to the city centre. */
 function liftDemandCap(view: CityView, plan: TurnPlan,
     counts: Census): Choice | null {
   if (plan.done.has('capped')) {
@@ -1020,20 +1020,24 @@ function liftDemandCap(view: CityView, plan: TurnPlan,
 
   const has: (tiles: number[]) => boolean = (tiles: number[]): boolean =>
     view.zones.some((zone: ZoneView): boolean => tiles.includes(zone.tile));
-  const needs: { capped: boolean; tool: string; size: number }[] = [
+  const needs: { capped: boolean; kind: ZoneKind; tool: string;
+    size: number; }[] = [
     {
       capped: counts.residential > STADIUM_RESIDENTS &&
         !has([STADIUM, FULLSTADIUM]),
+      kind: 'residential',
       tool: 'stadium',
       size: 4,
     },
     {
       capped: counts.commercial > AIRPORT_COMMERCE && !has([AIRPORT]),
+      kind: 'commercial',
       tool: 'airport',
       size: 6,
     },
     {
       capped: counts.industrial > SEAPORT_INDUSTRY && !has([PORT]),
+      kind: 'industrial',
       tool: 'port',
       size: 4,
     },
@@ -1047,8 +1051,14 @@ function liftDemandCap(view: CityView, plan: TurnPlan,
     const choice: Choice | null = buildNear(view, plan, need.tool, need.tool,
       need.size, roadSites(view, plan, need.size), plan.centre);
 
-    // Saving for these held up all growth for years, so the rule never waits
+    /* Saving for these held up all growth for years where the demand would
+     * not have grown anyway. So the rule waits for the money only while
+     * the engine holds the demand at 0 for want of the building. */
     if (plan.outOfMoney) {
+      if (view.state.caps[need.kind] && view.state.rci[need.kind] === 0) {
+        return null;
+      }
+
       plan.outOfMoney = false;
       plan.waiting = null;
       return null;
@@ -1098,6 +1108,7 @@ function rememberFunds(memory: Memory, plan: TurnPlan): void {
     month: plan.month,
     funds: plan.funds,
     reserve: plan.reserve,
+    waited: false,
   });
 
   while (memory.funds.length > 1 &&
@@ -1118,10 +1129,20 @@ function moneyPilesUp(memory: Memory, plan: TurnPlan): boolean {
       record.funds >= record.reserve + PILE_UP_MARGIN);
 }
 
+/* The agent is saving up when it waited for money in most of its turns
+ * over the last year, this one left out. */
+function isSaving(memory: Memory): boolean {
+  const earlier: FundsRecord[] = memory.funds.slice(0, -1);
+
+  return earlier.filter((record: FundsRecord): boolean => record.waited)
+    .length * 2 > earlier.length;
+}
+
 /* Rule 7: the tax rate moves 1 a year towards the base of the level, then
  * goes 1 lower when money piles up and taxes are among the worst problems,
- * and 1 higher again when the city cannot pay its yearly budget, but
- * never above the base. */
+ * and 1 higher again when the city cannot pay its yearly budget or the
+ * agent is saving up, but never above the base. While it saves the rate is
+ * never cut, though the money it saves piles up. */
 function adjustTax(view: CityView, plan: TurnPlan, memory: Memory,
     counts: Census): Choice | null {
   const rate: number = view.state.taxRate;
@@ -1132,14 +1153,15 @@ function adjustTax(view: CityView, plan: TurnPlan, memory: Memory,
   }
 
   const base: number = TAX_BASE_BY_LEVEL[view.level];
+  const saving: boolean = isSaving(memory);
   let change: number = 0;
 
   if (rate > base) {
     change = -1;
   } else if (rate < TAX_MIN ||
-      (rate < base && cannotPay(view, plan, counts))) {
+      (rate < base && (saving || cannotPay(view, plan, counts)))) {
     change = 1;
-  } else if (rate > TAX_MIN && moneyPilesUp(memory, plan) &&
+  } else if (rate > TAX_MIN && !saving && moneyPilesUp(memory, plan) &&
       taxRank(view.state) < WORST_PROBLEMS) {
     change = -1;
   }
@@ -1504,8 +1526,8 @@ function commit(view: CityView, plan: TurnPlan, memory: Memory,
 
 /* A rule-based agent. Each turn, up to the action limit and while the
  * money lasts, it plays the first of its rules that fits, then checks them
- * again: a fire emergency, power, the budget, road repairs, police, fire
- * stations, capped demand, taxes, demolition and growth. It keeps a
+ * again: a fire emergency, power, the budget, road repairs, capped
+ * demand, police, fire stations, taxes, demolition and growth. It keeps a
  * reserve for the next yearly budget. A rule that fits but costs more than
  * the money above the reserve makes the agent wait: the rest of the turn
  * plays only the fire emergency and the free rules, the budget and the
@@ -1585,12 +1607,12 @@ function createRulesAgent(): Agent {
         { free: true, run: (): Choice | null => restoreFunding(view, plan) },
         { free: true, run: (): Choice | null => restoreAutoBudget(view, plan) },
         { free: false, run: (): Choice | null => repairRoad(view, plan) },
-        { free: false, run: (): Choice | null => buildPolice(view, plan) },
-        { free: false, run: (): Choice | null => buildFireStation(view, plan) },
         {
           free: false,
           run: (): Choice | null => liftDemandCap(view, plan, counts),
         },
+        { free: false, run: (): Choice | null => buildPolice(view, plan) },
+        { free: false, run: (): Choice | null => buildFireStation(view, plan) },
         {
           free: true,
           run: (): Choice | null => adjustTax(view, plan, memory, counts),
@@ -1630,6 +1652,7 @@ function createRulesAgent(): Agent {
         commit(view, plan, memory, choice);
       }
 
+      memory.funds[memory.funds.length - 1].waited = plan.waiting !== null;
       report = {
         rules: plan.rules,
         waiting: plan.waiting,
