@@ -229,6 +229,8 @@ import { createRulesAgent } from './agents/rules.ts';
 const log: RunLog = await runGame(createRulesAgent(), { seed: 1 });
 ```
 
+The agent is frozen as the reference baseline at commit `d03cf4e`: it is meant to be simple and transparent, playing well is left to MCTS and the LLMs, it only gets bug fixes from now on, each saying whether it changes the results of the sanity runs, and its known limitations stay as they are, going broke on hard, rarely building an airport and a base tax of 6% for medium that was never tuned.
+
 The rule-based agent deals with all the problems of the city and can demolish. Each turn, up to the action limit and while the money lasts, it plays the first of these rules that fits, then checks them again:
 
 0. Fire, an emergency: when something burns, a fire station near the fire if no station covers it, and a firebreak, bulldozing the trees, parks, roads, rails and power lines next to the fire. Both may use the reserve.
