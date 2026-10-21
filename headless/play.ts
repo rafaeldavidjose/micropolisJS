@@ -34,7 +34,7 @@ interface PlayArguments {
     'disasters': string;
     'turns': string;
     'months': string;
-    'max-actions': string;
+    'action-cap': string;
     'out': string;
   };
 }
@@ -50,8 +50,8 @@ const { values }: PlayArguments = parseArgs({
     'months': {
       type: 'string', default: String(DEFAULT_OPTIONS.monthsPerTurn),
     },
-    'max-actions': {
-      type: 'string', default: String(DEFAULT_OPTIONS.maxActionsPerTurn),
+    'action-cap': {
+      type: 'string', default: String(DEFAULT_OPTIONS.actionCap),
     },
     'out': { type: 'string', default: 'run.json' },
   },
@@ -103,7 +103,7 @@ const log: RunLog = await runGame(
     disasters: values.disasters === 'on',
     turns: wholeNumber('turns', values.turns),
     monthsPerTurn: wholeNumber('months', values.months),
-    maxActionsPerTurn: wholeNumber('max-actions', values['max-actions']),
+    actionCap: wholeNumber('action-cap', values['action-cap']),
   });
 
 const out: string = values.out;
@@ -116,6 +116,10 @@ const windowYears: Set<number> = new Set(allBudgetWindows(log).map(
   (window: { date: { year: number } }): number => window.date.year));
 const applied: number = log.turns.reduce(
   (sum: number, turn: TurnLog): number => sum + turn.actions.length, 0);
+const cutTurns: TurnLog[] = log.turns.filter(
+  (turn: TurnLog): boolean => turn.dropped > 0);
+const cut: number = cutTurns.reduce(
+  (sum: number, turn: TurnLog): number => sum + turn.dropped, 0);
 
 console.log(`${log.agent.name} on seed ${seed}: ` +
   `${log.final.date.year}-${log.final.date.month + 1}, ` +
@@ -123,3 +127,8 @@ console.log(`${log.agent.name} on seed ${seed}: ` +
   `funds ${log.final.state.funds}, ` +
   `${applied} actions, budget windows in ${windowYears.size} years. ` +
   `Log in ${relative(process.cwd(), path)}`);
+
+if (cut > 0) {
+  console.log(`The action cap of ${log.options.actionCap} cut ${cut} ` +
+    `actions in ${cutTurns.length} turns, see dropped in the log.`);
+}

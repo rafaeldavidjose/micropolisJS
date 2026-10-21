@@ -111,7 +111,7 @@ test('game: actions are applied in order and their results kept',
   async (): Promise<void> => {
   const log: RunLog = await runGame(
     scriptedAgent([...FIRST_TURN, ...BROKEN]),
-    { seed: SEED, turns: 2, maxActionsPerTurn: 20 });
+    { seed: SEED, turns: 2, actionCap: 20 });
   const results: ActionResult[] = log.turns[0].actions.map(
     (applied: { result: ActionResult }): ActionResult => applied.result);
 
@@ -138,13 +138,20 @@ test('game: actions are applied in order and their results kept',
     2);
 });
 
-test('game: actions past the limit are dropped and counted',
+/* The cap is a safeguard of the runner, 100 unless set, and the log counts
+ * what it cut. */
+test('game: actions past the cap are cut and counted',
   async (): Promise<void> => {
   const log: RunLog = await runGame(scriptedAgent(FIRST_TURN),
-    { seed: SEED, turns: 1, maxActionsPerTurn: 3 });
+    { seed: SEED, turns: 1, actionCap: 3 });
+  const uncapped: RunLog = await runGame(scriptedAgent(FIRST_TURN),
+    { seed: SEED, turns: 1 });
 
   assert.equal(log.turns[0].actions.length, 3);
   assert.equal(log.turns[0].dropped, FIRST_TURN.length - 3);
+  assert.equal(uncapped.options.actionCap, 100);
+  assert.equal(uncapped.turns[0].actions.length, FIRST_TURN.length);
+  assert.equal(uncapped.turns[0].dropped, 0);
 });
 
 test('game: a quote in the view matches the applied action',
@@ -168,7 +175,7 @@ test('game: a quote in the view matches the applied action',
 test('game: the map changes in the log add up to the final map',
   async (): Promise<void> => {
   const log: RunLog = await runGame(scriptedAgent(FIRST_TURN),
-    { seed: SEED, turns: 6, monthsPerTurn: 2, maxActionsPerTurn: 20 });
+    { seed: SEED, turns: 6, monthsPerTurn: 2, actionCap: 20 });
 
   assert.ok(log.map !== null);
   const tiles: number[] = [...log.map.tiles];
@@ -200,7 +207,7 @@ test('game: the map changes in the log add up to the final map',
 test('game: the same agent and options give the same log',
   async (): Promise<void> => {
   const options: Partial<GameOptions> & { seed: number } =
-    { seed: SEED, turns: 4, maxActionsPerTurn: 20 };
+    { seed: SEED, turns: 4, actionCap: 20 };
   const first: RunLog = await runGame(scriptedAgent(FIRST_TURN), options);
   const second: RunLog = await runGame(scriptedAgent(FIRST_TURN), options);
 
@@ -214,7 +221,7 @@ test('game: an agent can answer with a promise', async (): Promise<void> => {
       view.turn === 0 ? FIRST_TURN : [],
   };
   const options: Partial<GameOptions> & { seed: number } =
-    { seed: SEED, turns: 3, maxActionsPerTurn: 20 };
+    { seed: SEED, turns: 3, actionCap: 20 };
 
   assert.deepEqual(await runGame(waiting, options),
     await runGame(scriptedAgent(FIRST_TURN), options));

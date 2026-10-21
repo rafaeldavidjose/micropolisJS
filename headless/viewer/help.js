@@ -194,10 +194,11 @@ const HELP = {
     'its own fields, and the passive agent none.',
 
   // drawTracks and drawSeries in viewer.js
-  actionsTrack: 'The actions of every turn. A bar is the share of the ' +
-    'action limit played, its red part the share that failed, and a blue ' +
-    'mark a turn in which a budget window opened. Long gaps are turns in ' +
-    'which the agent played nothing.',
+  actionsTrack: 'The actions of every turn. A full bar is the agent\'s ' +
+    'own limit, or the busiest turn of the game for an agent without ' +
+    'one. The red part are the actions that failed, and a blue mark a ' +
+    'turn in which a budget window opened. Long gaps are turns in which ' +
+    'the agent played nothing.',
   populationTrack: 'The population at the start of every turn, scaled to ' +
     'the highest value of the game. The dot is the current turn.',
   fundsTrack: 'The funds at the start of every turn, scaled to the highest ' +
@@ -212,7 +213,7 @@ const REPORT_HELP = {
   // random.ts TurnReport
   random: {
     slots: 'How many actions the random agent tried to play this turn, ' +
-      'drawn from 0 to the action limit.',
+      'drawn from 0 to its own limit, 5 unless set.',
     nothing: 'Slots in which it drew the category "nothing".',
     draws: 'Actions it drew and quoted this turn, the rejected ones ' +
       'included.',

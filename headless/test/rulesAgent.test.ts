@@ -38,7 +38,6 @@ const OPTIONS: Partial<GameOptions> & { seed: number } = {
 
 // The towns below are built on clear land of this map, east of its river
 const TOWN_SEED: number = 20260926;
-const AGENT_ACTIONS: number = 5;
 
 interface Script {
   setup: GameAction[];
@@ -80,7 +79,7 @@ function scripted(script: Script, agent: Agent): Agent {
       const state: CityView['state'] = script.funds === undefined ?
         view.state : { ...view.state, funds: script.funds };
       const actions: GameAction[] = await agent.decide(
-        { ...view, maxActions: AGENT_ACTIONS, state: state });
+        { ...view, state: state });
 
       return [...actions, ...(script.later?.[view.turn] ?? [])];
     },
@@ -89,7 +88,7 @@ function scripted(script: Script, agent: Agent): Agent {
 
 function playTown(script: Script, turns: number): Promise<RunLog> {
   return runGame(scripted(script, createRulesAgent()),
-    { seed: TOWN_SEED, turns: turns, maxActionsPerTurn: 400 });
+    { seed: TOWN_SEED, turns: turns, actionCap: 400 });
 }
 
 // A coal plant and four commercial zones with power along a short road

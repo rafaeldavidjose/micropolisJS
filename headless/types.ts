@@ -302,10 +302,12 @@ interface CityBlockMaps {
 }
 
 /* What an agent sees at the start of a turn. Quotes and plans are made
- * against the city as it is then, before any of the agent's actions. */
+ * against the city as it is then, before any of the agent's actions.
+ * actionCap is the runner's safeguard against a runaway answer, not a
+ * number of actions to aim for. Each agent sets its own limit, if any. */
 interface CityView {
   turn: number;
-  maxActions: number;
+  actionCap: number;
   level: number;
   state: CityState;
   map: MapView;
@@ -330,7 +332,7 @@ interface GameOptions {
   disasters: boolean;
   turns: number;
   monthsPerTurn: number;
-  maxActionsPerTurn: number;
+  actionCap: number;
   recordMap: boolean;
   recordSprites: boolean;
 }
@@ -351,6 +353,7 @@ interface TurnLog {
   state: CityState;
   mapChanges: [number, number][];
   actions: AppliedAction[];
+  // Actions the runner's cap cut from the end of the agent's answer
   dropped: number;
   budgetWindows: BudgetWindowRecord[];
   sprites: SpriteSample[];

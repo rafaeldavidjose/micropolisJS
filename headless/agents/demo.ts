@@ -25,6 +25,9 @@ interface Step {
 const SITE_WIDTH: number = 31;
 const SITE_HEIGHT: number = 14;
 
+// The steps a turn builds at most, the agent's own limit
+const MAX_ACTIONS: number = 5;
+
 function zone(turn: number, tool: string, x: number, y: number): Step {
   return { turn: turn, action: { type: 'build', tool: tool, x: x, y: y } };
 }
@@ -145,9 +148,9 @@ function placeAt(action: GameAction, site: Position): GameAction {
   }
 }
 
-/* Each turn it builds the next steps whose turn has come, up to the
- * maximum number of actions. It waits while the money is short, and skips
- * a step the engine refuses for any other reason. */
+/* Each turn it builds the next steps whose turn has come, up to its own
+ * limit of MAX_ACTIONS. It waits while the money is short, and skips a
+ * step the engine refuses for any other reason. */
 function createDemoAgent(): Agent {
   let site: Position | null = null;
   let next: number = 0;
@@ -155,7 +158,8 @@ function createDemoAgent(): Agent {
 
   return {
     name: 'demo',
-    settings: (): Record<string, unknown> => ({ site: site }),
+    settings: (): Record<string, unknown> =>
+      ({ site: site, maxActions: MAX_ACTIONS }),
     report: (): Record<string, unknown> => ({ next: next, skipped: skipped }),
     decide: (view: CityView): GameAction[] => {
       site = site ?? findSite(view);
@@ -163,7 +167,7 @@ function createDemoAgent(): Agent {
       const actions: GameAction[] = [];
       let funds: number = view.state.funds;
 
-      while (next < TOWN.length && actions.length < view.maxActions &&
+      while (next < TOWN.length && actions.length < MAX_ACTIONS &&
              TOWN[next].turn <= view.turn) {
         const action: GameAction = placeAt(TOWN[next].action, site);
         const quote: ActionResult = view.quote(action);

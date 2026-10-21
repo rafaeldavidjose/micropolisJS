@@ -140,6 +140,9 @@ const PLANT_SIZE: number = 4;
 // The first road runs this far over free land, room for two zones a side
 const ROAD_LENGTH: number = 6;
 
+// The actions a turn plays at most, the agent's own limit
+const MAX_ACTIONS: number = 5;
+
 // Route searches a turn may spend on new roads and on repairs
 const ROAD_ENDS_TRIED: number = 20;
 const REPAIRS_TRIED: number = 20;
@@ -236,6 +239,10 @@ interface Census {
 interface CoveredSite {
   centre: Position;
   covered: number;
+}
+
+interface RulesAgentOptions {
+  maxActions?: number;
 }
 
 function monthOf(date: CityDate): number {
@@ -1524,16 +1531,17 @@ function commit(view: CityView, plan: TurnPlan, memory: Memory,
   }
 }
 
-/* A rule-based agent. Each turn, up to the action limit and while the
- * money lasts, it plays the first of its rules that fits, then checks them
- * again: a fire emergency, power, the budget, road repairs, capped
- * demand, police, fire stations, taxes, demolition and growth. It keeps a
- * reserve for the next yearly budget. A rule that fits but costs more than
- * the money above the reserve makes the agent wait: the rest of the turn
- * plays only the fire emergency and the free rules, the budget and the
- * taxes. It draws no random numbers, and routes only get their two ends
- * from it, the route itself comes from planRoute. */
-function createRulesAgent(): Agent {
+/* A rule-based agent. Each turn, up to its own limit of actions, 5 unless
+ * set, and while the money lasts, it plays the first of its rules that
+ * fits, then checks them again: a fire emergency, power, the budget, road
+ * repairs, capped demand, police, fire stations, taxes, demolition and
+ * growth. It keeps a reserve for the next yearly budget. A rule that fits
+ * but costs more than the money above the reserve makes the agent wait:
+ * the rest of the turn plays only the fire emergency and the free rules,
+ * the budget and the taxes. It draws no random numbers, and routes only
+ * get their two ends from it, the route itself comes from planRoute. */
+function createRulesAgent(options: RulesAgentOptions = {}): Agent {
+  const maxActions: number = options.maxActions ?? MAX_ACTIONS;
   const memory: Memory = {
     roads: new Set(),
     emptySince: new Map(),
@@ -1558,6 +1566,7 @@ function createRulesAgent(): Agent {
       nextToGap: NEXT_TO_GAP,
       coalPlantTiles: COAL_PLANT_TILES,
       nuclearPlantTiles: NUCLEAR_PLANT_TILES,
+      maxActions: maxActions,
     }),
     report: (): Record<string, unknown> => report,
     decide: (view: CityView): GameAction[] => {
@@ -1630,7 +1639,7 @@ function createRulesAgent(): Agent {
         { free: false, run: (): Choice | null => grow(view, plan) },
       ];
 
-      while (plan.actions.length < view.maxActions) {
+      while (plan.actions.length < maxActions) {
         let choice: Choice | null = null;
 
         for (const rule of rules) {

@@ -38,11 +38,13 @@ const BUILDING_TOOLS: readonly string[] = BUILD_TOOLS.filter(
 const MAX_TAX_RATE: number = 20;
 const MAX_PERCENT: number = 100;
 
+// maxActions is a whole number, since the slots are drawn up to it
 interface RandomAgentOptions {
   seed: number;
   weights?: Partial<Record<Category, number>>;
   maxRouteDistance?: number;
   maxTries?: number;
+  maxActions?: number;
 }
 
 // What happened to the agent's draws in one turn
@@ -160,9 +162,10 @@ function drawAction(rng: Rng, view: CityView, category: Category,
   }
 }
 
-/* Plays random valid actions. Each turn it takes 0 to maxActions slots.
- * Each slot picks a category by weight, then draws the parameters and
- * quotes the action. A failing draw is rejected and drawn again, up to
+/* Plays random valid actions. Each turn it takes 0 to maxActions slots, 5
+ * unless set, a limit the agent keeps itself. Each slot picks a category
+ * by weight, then draws the parameters and quotes the action. A failing
+ * draw is rejected and drawn again, up to
  * maxTries times. The money its earlier actions of the turn will spend is
  * kept aside, so it does not pick more than the city can pay. The start
  * tiles of routes are worked out once per turn and tool. */
@@ -174,6 +177,7 @@ function createRandomAgent(options: RandomAgentOptions): Agent {
   };
   const maxRouteDistance: number = options.maxRouteDistance ?? 20;
   const maxTries: number = options.maxTries ?? 20;
+  const maxActions: number = options.maxActions ?? 5;
   let report: TurnReport | null = null;
 
   return {
@@ -183,6 +187,7 @@ function createRandomAgent(options: RandomAgentOptions): Agent {
       weights: weights,
       maxRouteDistance: maxRouteDistance,
       maxTries: maxTries,
+      maxActions: maxActions,
     }),
     report: (): Record<string, unknown> => ({ ...report }),
     decide: (view: CityView): GameAction[] => {
@@ -198,7 +203,7 @@ function createRandomAgent(options: RandomAgentOptions): Agent {
           return starts.get(tool) as Position[];
         };
       const turn: TurnReport = {
-        slots: rng.int(view.maxActions + 1),
+        slots: rng.int(maxActions + 1),
         nothing: 0,
         draws: 0,
         rejected: 0,

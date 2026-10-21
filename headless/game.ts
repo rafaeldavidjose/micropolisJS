@@ -49,7 +49,7 @@ import type {
   ZoneView,
 } from './types.ts';
 
-const LOG_VERSION: number = 5;
+const LOG_VERSION: number = 6;
 const JSON_INDENT: string = '  ';
 
 /* Sprites move 3 times per tick. A tornado moves about 2 pixels a move
@@ -60,13 +60,15 @@ const SPRITE_SAMPLE_TICKS: number = 4;
 
 /* Provisional until the experiment is designed. Level and disasters are
  * what a new game starts with in the browser. 80 turns of 3 months are 20
- * years. */
+ * years. There is no limit on the actions of a turn: actionCap only keeps
+ * a runaway answer, from a loop or a language model, from going on and on.
+ * Agents that play a fixed number of actions keep that limit themselves. */
 const DEFAULT_OPTIONS: Omit<GameOptions, 'seed'> = {
   level: Simulation.LEVEL_EASY,
   disasters: false,
   turns: 80,
   monthsPerTurn: 3,
-  maxActionsPerTurn: 5,
+  actionCap: 100,
   recordMap: true,
   recordSprites: true,
 };
@@ -305,7 +307,7 @@ function makeView(city: SimulationLike, settings: GameOptions,
 
   return {
     turn: turn,
-    maxActions: settings.maxActionsPerTurn,
+    actionCap: settings.actionCap,
     level: settings.level,
     state: getState(city),
     map: mapView,
@@ -320,7 +322,9 @@ function makeView(city: SimulationLike, settings: GameOptions,
 
 /* Plays one game. Each turn the agent sees the city and returns actions,
  * the actions are applied in order, and the city runs for monthsPerTurn
- * months. Actions past maxActionsPerTurn are dropped and counted. */
+ * months. Actions past actionCap are cut and counted in the log. The cap
+ * only cuts the list the agent returns, so it cannot stop an agent whose
+ * own loop never ends. */
 async function runGame(agent: Agent,
     options: Partial<GameOptions> & { seed: number }): Promise<RunLog> {
   const settings: GameOptions = { ...DEFAULT_OPTIONS, ...options };
@@ -340,7 +344,7 @@ async function runGame(agent: Agent,
     const chosen: GameAction[] = await agent.decide(view);
     const actions: unknown[] = Array.isArray(chosen) ? chosen : [];
     const applied: AppliedAction[] = actions
-      .slice(0, settings.maxActionsPerTurn)
+      .slice(0, settings.actionCap)
       .map((action: unknown): AppliedAction => playAction(city, action));
     const windowsBefore: number = getBudgetLog(city).length;
     const sprites: SpriteSample[] = [];
@@ -363,7 +367,7 @@ async function runGame(agent: Agent,
       state: view.state,
       mapChanges: settings.recordMap ? diffTiles(lastTiles, tiles) : [],
       actions: applied,
-      dropped: Math.max(0, actions.length - settings.maxActionsPerTurn),
+      dropped: Math.max(0, actions.length - settings.actionCap),
       budgetWindows: getBudgetLog(city).slice(windowsBefore),
       sprites: sprites,
       agent: agent.report ? agent.report() : null,

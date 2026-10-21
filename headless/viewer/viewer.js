@@ -507,6 +507,59 @@ async function start(log, name) {
 }
 
 /**
+ * Logs before version 6 had a limit of the runner on the actions of a
+ * turn. Newer logs have a safety cap instead, and each agent its own
+ * limit, if any.
+ * @param {RunLog} log
+ * @returns {number | undefined}
+ */
+function oldActionLimit(log) {
+  return /** @type {{ maxActionsPerTurn?: number }} */ (log.options)
+    .maxActionsPerTurn;
+}
+
+/**
+ * The agent's own limit on the actions of a turn, from its settings.
+ * @param {RunLog} log
+ * @returns {number | undefined}
+ */
+function agentActionLimit(log) {
+  /** @type {unknown} */
+  const limit = log.agent.settings?.maxActions;
+
+  return typeof limit === 'number' ? limit : undefined;
+}
+
+/**
+ * The action limits for the title bar: the runner's cap and the agent's
+ * own limit, or the runner's limit of an older log.
+ * @param {RunLog} log
+ * @returns {[string, unknown][]}
+ */
+function actionSettings(log) {
+  /** @type {number | undefined} */
+  const old = oldActionLimit(log);
+
+  return old !== undefined ? [['max actions', old]] : [
+    ['action cap', log.options.actionCap],
+    ['agent limit', agentActionLimit(log) ?? 'none'],
+  ];
+}
+
+/**
+ * What a full bar of the actions track stands for: the agent's own limit,
+ * the runner's limit of an older log, or else the busiest turn.
+ * @param {RunLog} log
+ * @returns {number}
+ */
+function actionScale(log) {
+  return Math.max(1, agentActionLimit(log) ?? oldActionLimit(log) ??
+    Math.max(0, ...log.turns.map(
+      /** @param {TurnLog} turn @returns {number} */
+      (turn) => turn.actions.length)));
+}
+
+/**
  * @returns {void}
  */
 function showSettings() {
@@ -526,7 +579,7 @@ function showSettings() {
     ['disasters', options.disasters ? 'on' : 'off'],
     ['months/turn', options.monthsPerTurn],
     ['turns', run.log.turns.length],
-    ['max actions', options.maxActionsPerTurn],
+    ...actionSettings(run.log),
   ];
 
   byId('file-name').textContent = run.name;
@@ -1168,7 +1221,10 @@ function showActions() {
   }
 
   if (turn.dropped > 0) {
-    notes.push(`${turn.dropped} more were dropped past the limit.`);
+    notes.push(oldActionLimit(run.log) === undefined ?
+      `${turn.dropped} more were cut by the runner's safety cap of ` +
+        `${run.log.options.actionCap}.` :
+      `${turn.dropped} more were dropped past the limit.`);
   }
 
   byId('actions-note').textContent = notes.join(' ');
@@ -1675,7 +1731,7 @@ function drawTracks() {
   /** @type {number} */
   const room = lane.height - 15;
   /** @type {number} */
-  const limit = Math.max(1, run.log.options.maxActionsPerTurn);
+  const limit = actionScale(run.log);
   /** @type {number} */
   const bottom = lane.top + lane.height - 1;
 

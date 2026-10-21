@@ -98,7 +98,10 @@ test('random agent: it keeps to the limits and the weights',
     weights: { building: 0, bulldoze: 0, tax: 0, budget: 0, autoBudget: 0,
       nothing: 0 },
     maxRouteDistance: 6,
-  }), { ...OPTIONS, maxActionsPerTurn: 3 });
+    maxActions: 3,
+  }), OPTIONS);
+
+  assert.equal(routes.agent.settings?.maxActions, 3);
 
   for (const turn of routes.turns) {
     assert.ok(turn.actions.length <= 3);
