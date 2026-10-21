@@ -247,6 +247,34 @@ test('game: the log is written as JSON', async (): Promise<void> => {
   assert.deepEqual(JSON.parse(readFileSync(path, 'utf8')), log);
 });
 
+/* Anything that reads a log with JSON.parse reads old logs on one line and
+ * new indented ones alike, so the two must parse to the same log. */
+test('game: the log is indented with number arrays on one line',
+  async (): Promise<void> => {
+  const log: RunLog = await runGame(scriptedAgent(FIRST_TURN),
+    { seed: SEED, turns: 3 });
+  const path: string = join(mkdtempSync(join(tmpdir(), 'run-')), 'log.json');
+
+  writeRunLog(path, log);
+
+  const text: string = readFileSync(path, 'utf8');
+  const lines: string[] = text.split('\n');
+  const mapStart: number = lines.indexOf('    "tiles": [');
+  const rows: string[] = lines.slice(mapStart + 1,
+    mapStart + 1 + log.map.height);
+
+  assert.deepEqual(JSON.parse(text), JSON.parse(JSON.stringify(log)));
+  assert.ok(mapStart > 0);
+  assert.ok(rows.every((row: string): boolean =>
+    row.split(',').filter((cell: string): boolean => cell.trim() !== '')
+      .length === log.map.width));
+  assert.ok(lines.some((line: string): boolean =>
+    /^ +"tiles": \[\[\d+,\d+\](,\[\d+,\d+\])*\],?$/.test(line)));
+  assert.ok(lines.filter((line: string): boolean =>
+    line.includes('"mapChanges"')).every((line: string): boolean =>
+    /\],?$/.test(line)));
+});
+
 /* On hard with disasters on, a monster comes to the demo town on seed 10
  * in the fourth turn. Reading the sprites must not change the run, so the
  * city, the states and the game's next random number are the same. */

@@ -50,6 +50,7 @@ import type {
 } from './types.ts';
 
 const LOG_VERSION: number = 5;
+const JSON_INDENT: string = '  ';
 
 /* Sprites move 3 times per tick. A tornado moves about 2 pixels a move
  * and a train 4, so with a sample every time unit (16 ticks) a tornado
@@ -396,8 +397,67 @@ async function runGame(agent: Agent,
   };
 }
 
+// A number, or an array of nothing but numbers and such arrays
+function isNumeric(value: unknown): boolean {
+  return typeof value === 'number' ||
+    (Array.isArray(value) && value.every(isNumeric));
+}
+
+/* JSON indented by two spaces, with arrays of numbers on one line: a
+ * turn's map changes, a route's tiles and each sprite sample take a line,
+ * and the first map a line per row. Indenting those too makes a log of
+ * 1,000 turns about three times as big. rowLength is the map width for the
+ * tiles of the first map. */
+function formatJson(value: unknown, indent: string, key: string,
+    rowLength: number): string {
+  const inner: string = indent + JSON_INDENT;
+
+  if (Array.isArray(value)) {
+    if (value.length === 0 ||
+        (rowLength === 0 && key !== 'sprites' && isNumeric(value))) {
+      return JSON.stringify(value);
+    }
+
+    const lines: string[] = [];
+
+    if (rowLength > 0) {
+      for (let start: number = 0; start < value.length; start += rowLength) {
+        lines.push(inner +
+          JSON.stringify(value.slice(start, start + rowLength)).slice(1, -1));
+      }
+    } else {
+      for (const item of value) {
+        lines.push(inner + (key === 'sprites' ? JSON.stringify(item) :
+          formatJson(item, inner, '', 0)));
+      }
+    }
+
+    return '[\n' + lines.join(',\n') + '\n' + indent + ']';
+  }
+
+  if (typeof value === 'object' && value !== null) {
+    const entries: [string, unknown][] = Object.entries(value);
+    const width: number = key === 'map' ?
+      (value as NonNullable<RunLog['map']>).width : 0;
+
+    if (entries.length === 0) {
+      return '{}';
+    }
+
+    return '{\n' + entries.map(([name, item]: [string, unknown]): string =>
+      inner + JSON.stringify(name) + ': ' +
+      formatJson(item, inner, name, name === 'tiles' ? width : 0))
+      .join(',\n') + '\n' + indent + '}';
+  }
+
+  return JSON.stringify(value);
+}
+
+/* The round trip through JSON.stringify drops what JSON drops, like fields
+ * left undefined, so the file reads back as the same log. */
 function writeRunLog(path: string, log: RunLog): void {
-  writeFileSync(path, JSON.stringify(log));
+  writeFileSync(path,
+    formatJson(JSON.parse(JSON.stringify(log)), '', '', 0) + '\n');
 }
 
 // Collects every budget window of a run, for counting shortages
